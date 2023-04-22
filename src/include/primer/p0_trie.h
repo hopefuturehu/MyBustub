@@ -212,8 +212,9 @@ class TrieNodeWithValue : public TrieNode {
    * @param trieNode TrieNode whose data is to be moved to TrieNodeWithValue
    * @param value
    */
-  TrieNodeWithValue(TrieNode &&trieNode, T value) : TrieNode(trieNode), value_(value) {
+  TrieNodeWithValue(TrieNode &&trieNode, T value) : TrieNode(std::forward<TrieNode>(trieNode)) {
     SetEndNode(true);
+    value_ = value;
   }
 
   /**
@@ -301,35 +302,40 @@ class Trie {
     latch_.WLock();
     auto cur_node = &root_;
     int len = key.size();
-    for (int i = 0; i < len; ++i){
-      if(i == len - 1) {
-        if(cur_node->get()->HasChild(key[i])){
-          cur_node = cur_node->get()->GetChildNode(key[i]);
-          if(cur_node->get()->IsEndNode()){
-            latch_.WUnlock();
-            return false; //existing key
-          }
-        }
-        auto new_node = new TrieNodeWithValue(std::move(**cur_node), value);
-        cur_node.reset(new_node);
-        latch_.WUnlock();
-        return true;
-      }
-      else {
+    for(int i = 0; i < len; ++i){
+      if(i < len - 1){ //insert
         if(cur_node->get()->HasChild(key[i])){
           cur_node = cur_node->get()->GetChildNode(key[i]);
         }
         else {
-          TrieNode new_node(key[i]);
-          cur_node->get()->InsertChildNode(key[i], std::make_unique<TrieNode>(*new_node));
-          cur_node = cur_node->get()->GetChildNode(key[i]);
+          cur_node = cur_node->get()->InsertChildNode(key[i], std::make_unique<TrieNode>(key[i])); //创建一个key[i]的TrieNode节点的指针
         }
       }
-      
+      else {
+        if(cur_node->get()->HasChild(key[i])){
+          auto end_node = cur_node->get()->GetChildNode(key[i]);
+          if(end_node->get()->IsEndNode()) {
+            latch_.WUnlock();
+            return false;
+          }
+          else {
+            auto new_node = new TrieNodeWithValue(std::move(**end_node), value);
+            end_node->reset(new_node);
+            latch_.WUnlock();
+            return true;
+          }
+        }
+        else {
+          cur_node = cur_node->get()->InsertChildNode(key[i], std::make_unique<TrieNode>(key[i]));
+          auto new_node = new TrieNodeWithValue(std::move(**cur_node), value);
+          cur_node->reset(new_node);
+          latch_.WUnlock();
+          return true;
+        }
+      }
     }
-
     latch_.WUnlock();
-    return true;
+    return false;
   }
 
   /**
@@ -350,6 +356,7 @@ class Trie {
    * @return True if the key exists and is removed, false otherwise
    */
   bool Remove(const std::string &key) {
+    return false;
   }
 
   /**
@@ -372,6 +379,7 @@ class Trie {
    */
   template <typename T>
   T GetValue(const std::string &key, bool *success) {
+    return 0;
   }
 };
 }  // namespace bustub
