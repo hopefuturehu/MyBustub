@@ -54,7 +54,7 @@ class TrieNode {
   TrieNode(TrieNode &&other_trie_node) noexcept {
     is_end_ = other_trie_node.is_end_;
     key_char_ = other_trie_node.key_char_;
-    std::swap(children_, other_trie_node.children_);
+    children_.swap(other_trie_node.children_);
   }
 
   /**
@@ -70,7 +70,7 @@ class TrieNode {
    * @param key_char Key char of child node.
    * @return True if this trie node has a child with given key, false otherwise.
    */
-  bool HasChild(char key_char) const { return !children_.count(key_char); }
+  bool HasChild(char key_char) const { return children_.count(key_char); }
 
   /**
    * TODO(P0): Add implementation
@@ -141,7 +141,7 @@ class TrieNode {
    */
   std::unique_ptr<TrieNode> *GetChildNode(char key_char) {
     if(children_.count(key_char)){
-      return &children_[key_char];
+      return &(children_[key_char]);
     }
     else {
       return nullptr;
