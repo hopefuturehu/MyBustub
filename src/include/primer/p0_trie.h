@@ -357,8 +357,33 @@ class Trie {
    */
   bool Remove(const std::string &key) {
     if(key.empty()) return false;
-    latch_
-    return false;
+    latch_.WLock();
+    int len = key.size();
+    auto cur_node = &root_;
+    std::stack<std::unique_ptr<TrieNode>*> stk;
+    for(char ch:key){
+      if(cur_node->get()->HasChild(ch)){
+        stk.push(cur_node);
+        cur_node = cur_node->get()->GetChildNode(ch);
+      }
+      else{
+        latch_.WUnlock();
+        return false;
+      }
+    }
+
+    if(!cur_node->get()->HasChildren()){
+      for(int i = len - 1; i >= 0; --i){
+        cur_node = stk.top();
+        stk.pop();
+        cur_node->get()->RemoveChildNode(key[i]);
+        if(cur_node->get()->IsEndNode() || cur_node->get()->HasChildren()){
+          break;
+        }
+      }
+    }
+    latch_.WUnlock();
+    return true;
   }
 
   /**
@@ -381,7 +406,30 @@ class Trie {
    */
   template <typename T>
   T GetValue(const std::string &key, bool *success) {
-    return 0;
+    if(key.empty()) *success = false;
+    latch_.WLock();
+    auto cur_node = &root_;
+    for(char ch:key){
+      if(cur_node->get()->HasChild(ch)){
+        cur_node = cur_node->get()->GetChildNode(ch);
+      }
+      else {
+        *success = false;
+        latch_.WUnlock();
+        return {};
+      }
+    }
+    if(cur_node->get()->IsEndNode()){
+        auto node_flag = dynamic_cast<TrieNodeWithValue<T>*>(cur_node->get());
+        if(node_flag != nullptr){
+          *success = true;
+          latch_.WUnlock();
+          return node_flag->GetValue();
+        }
+    }
+    *success = false;
+    latch_.WUnlock();
+    return {};
   }
 };
 }  // namespace bustub
