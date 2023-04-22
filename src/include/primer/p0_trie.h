@@ -120,12 +120,12 @@ class TrieNode {
    * @return Pointer to unique_ptr of the inserted child node. If insertion fails, return nullptr.
    */
   std::unique_ptr<TrieNode> *InsertChildNode(char key_char, std::unique_ptr<TrieNode> &&child) {
-    if(child->children_.count(key_char) || child->key_char_ != key_char){
+    if(children_.count(key_char) || child->key_char_ != key_char){
       return nullptr;
     }
     else {
       children_[key_char] = std::forward<std::unique_ptr<TrieNode>>(child);
-      return &child;
+      return &children_[key_char];
     }
   }
 
@@ -356,6 +356,8 @@ class Trie {
    * @return True if the key exists and is removed, false otherwise
    */
   bool Remove(const std::string &key) {
+    if(key.empty()) return false;
+    latch_
     return false;
   }
 
