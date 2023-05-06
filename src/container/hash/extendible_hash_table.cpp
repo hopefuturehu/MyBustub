@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <cassert>
+#include <cstddef>
 #include <cstdlib>
 #include <functional>
 #include <list>
@@ -83,10 +84,60 @@ auto ExtendibleHashTable<K, V>::Remove(const K &key) -> bool {
 
 template <typename K, typename V>
 void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
-  int ind = IndexOf(key);
-  if(dir_[ind]->Insert(key, value)){
-    return;
+  std::scoped_lock<std::mutex> lock(latch_);
+  bool nill = false;
+  while(!nill){
+    int dir_index = IndexOf(key);
+    std::shared_ptr<Bucket> target_bucket = dir_[dir_index];
+
+    nill = target_bucket->Insert(key, value);
+    
+    if(target_bucket->IsFull()){//step3:
+      if(GetGlobalDepth() == GetLocalDepth(dir_index)){
+        // increase GlobalDepth
+        IncreaseDepth();
+        for(size_t i = 0; i < dir_.size(); ++i){
+          std::shared_ptr<Bucket> tmp_bucket = dir_[i];
+          dir_.emplace_back(tmp_bucket);
+        }
+      }
+      //step4:
+      int local_mask = 1 << GetGlobalDepth();
+      num_buckets_++;
+      auto zerobucket = std::make_shared<Bucket>(GetLocalDepth(dir_index) + 1);
+      auto onebucket = std::make_shared<Bucket>(GetLocalDepth(dir_index) + 1);
+      for(const auto& item :target_bucket->GetItems()){
+        size_t hashkey = IndexOf(item.first);
+        if((hashkey & local_mask) == 1){
+          onebucket->Insert(item.first, item.second);
+        } else {
+          zerobucket->Insert(item.first, item.second);
+        }
+      }
+      //step5:
+      for(size_t i = 0; i < dir_.size(); i++){
+        if(dir_[i] == target_bucket){
+          if((i & local_mask) == 1){
+            dir_[i] = onebucket;
+          } else {
+            dir_[i] = zerobucket;        }
+        }
+      }
+    }
   }
+  
+
+/*
+1.尝试插入Key，若插入成功，返回即可，若不成功，执行步骤2。
+2.判断当前IndexOf(key)指向的bucket下，该bucket是否满了。如果满了，执行步骤3。否则执行步骤7。
+3.如果当前global depth等于local depth，说明bucket已满，需要增长direcotry的大小。增加directory的global depth，并将新增加的entry链接到对应的bucket。否则，继续执行步骤4。
+4.记录当前的local mask，创建bucket1和bucket2，增加两个bucket的local depth，增加num bucket的数量。取出之前满了的bucket中的元素，按照local mask的标准将每个元素重新分配到bucket1和bucket2中。执行步骤5。
+5.对每个链接到产生overflow的bucket的direcotry entry，按照local mask的标准，重新分配指针指向。执行步骤6。
+6.重新计算IndexOf(key)，执行步骤2。
+7.插入指定的key/value pair。
+
+*/
+  
 }
 
 //===--------------------------------------------------------------------===//
