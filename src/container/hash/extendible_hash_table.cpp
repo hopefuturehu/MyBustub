@@ -120,7 +120,8 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
           if((i & local_mask) == 1){
             dir_[i] = onebucket;
           } else {
-            dir_[i] = zerobucket;        }
+            dir_[i] = zerobucket;        
+          }
         }
       }
     }
