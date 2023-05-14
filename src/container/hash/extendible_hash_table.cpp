@@ -172,7 +172,9 @@ auto ExtendibleHashTable<K, V>::Bucket::Remove(const K &key) -> bool {
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Bucket::Insert(const K &key, const V &value) -> bool {
-  if (IsFull()) {
+  V find_value;
+  bool nill = Find(key, find_value);
+  if(nill || IsFull()){
     return false;
   }
   list_.emplace_back(key, value);
