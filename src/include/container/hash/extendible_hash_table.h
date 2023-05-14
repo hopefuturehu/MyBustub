@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <list>
 #include <memory>
 #include <mutex>  // NOLINT
@@ -113,7 +114,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
     explicit Bucket(size_t size, int depth = 0);
 
     /** @brief Check if a bucket is full. */
-    inline auto IsFull() const -> bool { return list_.size() == size_; }
+    inline auto IsFull() const -> bool { return !(list_.size() < size_); }
 
     /** @brief Get the local depth of the bucket. */
     inline auto GetDepth() const -> int { return depth_; }
@@ -197,7 +198,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
   auto GetLocalDepthInternal(int dir_index) const -> int;
   auto GetNumBucketsInternal() const -> int;
   
-  void IncreaseDepth() { global_depth_++; }
+  // void IncreaseDepth() { global_depth_++; }
 };
 
 }  // namespace bustub

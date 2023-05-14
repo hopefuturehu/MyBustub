@@ -54,10 +54,10 @@ int main()
     string choice, value;
 
     // Set show_messages to 0 when taking input using file redirection
-    show_messages = 0;
+    show_messages = false;
 
     // Set show_duplicate_buckets to 1 to see all pointers instead of unique ones
-    show_duplicate_buckets = 0;
+    show_duplicate_buckets = false;
 
     if(show_messages) { cout<<"Bucket size : "; }
     cin>>bucket_size;
