@@ -12,6 +12,7 @@
 
 #include "buffer/lru_k_replacer.h"
 #include <iterator>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 
@@ -20,6 +21,7 @@ namespace bustub {
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k) {}
 
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
+    std::scoped_lock<std::mutex> lock(latch_);
     if(history_.empty() && buffer_.empty()) {
         return false;
     }
@@ -39,6 +41,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
 }
 
 void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
+    std::scoped_lock<std::mutex> lock(latch_);
     if(frame_id > static_cast<int>(replacer_size_)) {
         throw std::logic_error(std::string("Invalid framed_id") + std::to_string(frame_id));
     }
@@ -75,6 +78,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
 }
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
+    std::scoped_lock<std::mutex> lock(latch_);
     if(set_evictable == true) {
         curr_size_++;
     }
@@ -120,6 +124,7 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
 }
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
+    std::scoped_lock<std::mutex> lock(latch_);
     if(non_evictale_.find(frame_id) != non_evictale_.end()){
         throw std::logic_error(std::string("Can't remove en invictable frame") + std::to_string(frame_id));
         return;
@@ -139,6 +144,7 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {
 }
 
 auto LRUKReplacer::Size() -> size_t {
+    std::scoped_lock<std::mutex> lock(latch_);
     return buffer_.size() + history_.size();
  }
 
