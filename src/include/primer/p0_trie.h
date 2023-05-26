@@ -290,7 +290,9 @@ class Trie {
    */
   template <typename T>
   bool Insert(const std::string &key, T value) {
-    if (key.empty()) { return false; }
+    if (key.empty()) {
+      return false;
+    }
     latch_.WLock();
     auto cur_node = &root_;
     int len = key.size();
@@ -343,7 +345,9 @@ class Trie {
    * @return True if the key exists and is removed, false otherwise
    */
   bool Remove(const std::string &key) {
-    if (key.empty()) { return false; }
+    if (key.empty()) {
+      return false;
+    }
     latch_.WLock();
     int len = key.size();
     auto cur_node = &root_;
@@ -392,7 +396,9 @@ class Trie {
    */
   template <typename T>
   T GetValue(const std::string &key, bool *success) {
-    if (key.empty()) { *success = false; }
+    if (key.empty()) {
+      *success = false;
+    }
     latch_.WLock();
     auto cur_node = &root_;
     for (char ch : key) {
