@@ -98,7 +98,11 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   */
   size_t dir_index;
   std::shared_ptr<Bucket> target_bucket;
-
+  V val;
+  if(dir_[IndexOf(key)]->Find(key, val)) {
+    dir_[IndexOf(key)]->Insert(key, value);\
+    return;
+  }
   while (dir_[IndexOf(key)]->IsFull()) {
     dir_index = IndexOf(key);
     target_bucket = dir_[dir_index];
@@ -172,14 +176,15 @@ auto ExtendibleHashTable<K, V>::Bucket::Remove(const K &key) -> bool {
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Bucket::Insert(const K &key, const V &value) -> bool {
-  V find_value;
-  bool nill = Find(key, find_value);
-  if (nill || IsFull()) {
-    return false;
+  for (auto iter = list_.begin(); iter != list_.end(); iter++) {
+    if (iter->first == key) {
+      iter->second = value;
+      return true;
+    }
   }
-  list_.emplace_back(key, value);
+  if(IsFull()) { return false; }
+  list_.emplace_back(std::pair(key, value));
   return true;
-  // If a key already exists, the value should be updated. Will be implement later
 }
 
 template class ExtendibleHashTable<page_id_t, Page *>;

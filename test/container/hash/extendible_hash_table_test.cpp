@@ -172,5 +172,30 @@ TEST(ExtendibleHashTableTest, GetNumBucketsTest) {
 
   EXPECT_EQ(8, table->GetNumBuckets());
 }
-}  // namespace bustub
 
+TEST(ExtendibleHashTableTest, InsertAndReplace) {
+  auto table = std::make_unique<ExtendibleHashTable<int, std::string>>(2);
+
+  table->Insert(4, "a");
+  table->Insert(12, "b");
+  table->Insert(16, "c");
+  EXPECT_EQ(4, table->GetNumBuckets());
+  table->Insert(64, "d");
+  table->Insert(31, "e");
+
+  table->Insert(10, "f");
+  table->Insert(51, "g");
+  EXPECT_EQ(4, table->GetNumBuckets());
+  table->Insert(15, "h");
+  table->Insert(18, "i");
+  table->Insert(20, "j");
+  EXPECT_EQ(7, table->GetNumBuckets());
+  table->Insert(7, "k");
+  table->Insert(23, "l");
+  table->Insert(4, "z");
+  std::string val = "s";
+  table->Find(4, val);
+  EXPECT_EQ(val, "z");
+  EXPECT_EQ(8, table->GetNumBuckets());
+}
+}  // namespace bustub
