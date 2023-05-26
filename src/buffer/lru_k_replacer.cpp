@@ -11,10 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "buffer/lru_k_replacer.h"
-#include <iterator>
-#include <mutex>
-#include <stdexcept>
-#include <string>
 
 namespace bustub {
 
