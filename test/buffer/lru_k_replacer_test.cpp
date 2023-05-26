@@ -97,4 +97,47 @@ TEST(LRUKReplacerTest, SampleTest) {
   lru_replacer.Remove(1);
   ASSERT_EQ(0, lru_replacer.Size());
 }
+TEST(LRUKReplacerTest, EvictTest) {
+  LRUKReplacer lru_replacer(7, 2);
+
+  lru_replacer.RecordAccess(1);
+  lru_replacer.RecordAccess(2);
+  lru_replacer.RecordAccess(3);
+  lru_replacer.RecordAccess(4);
+  lru_replacer.RecordAccess(5);
+  lru_replacer.RecordAccess(6);
+  lru_replacer.SetEvictable(1, true);
+  lru_replacer.SetEvictable(2, true);
+  lru_replacer.SetEvictable(3, true);
+  lru_replacer.SetEvictable(4, true);
+  lru_replacer.SetEvictable(5, true);
+  lru_replacer.SetEvictable(6, false);
+  lru_replacer.RecordAccess(1);
+  int value;
+  lru_replacer.Evict(&value);
+  ASSERT_EQ(2, value);
+  lru_replacer.Evict(&value);
+  ASSERT_EQ(3, value);
+  lru_replacer.Evict(&value);
+  ASSERT_EQ(4, value);
+  lru_replacer.Evict(&value);
+  ASSERT_EQ(5, value);
+  lru_replacer.Evict(&value);
+  ASSERT_EQ(1, value);
+  ASSERT_EQ(0, lru_replacer.Size());  
+}
+
+TEST(LRUKReplacerTest, AntiO2)
+{
+ LRUKReplacer lru_replacer(3, 2);
+ frame_id_t frame;
+ for(size_t i = 0; i < 6; ++i){
+  lru_replacer.RecordAccess(i % 2);
+ }
+ lru_replacer.Evict(&frame);
+ ASSERT_EQ(0, frame);
+ lru_replacer.Evict(&frame);
+ ASSERT_EQ(1, frame);
+}
+
 }  // namespace bustub

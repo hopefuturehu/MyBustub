@@ -32,7 +32,6 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
     history_map_.erase(del_frame->first);
     history_.pop_back();
   }
-  curr_size_--;
   return true;
 }
 
@@ -58,7 +57,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
     iter->second->second++;
     if (iter->second->second >= k_) {
       iter->second->second = current_timestamp_;
-      while (buffer_map_.size() + curr_size_ >= replacer_size_) {
+      while (buffer_map_.size() + non_evictale_.size() >= replacer_size_) {
         frame_id_t del_frame = std::prev(buffer_.end())->first;
         buffer_.pop_back();
         buffer_map_.erase(del_frame);
@@ -86,9 +85,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   std::scoped_lock<std::mutex> lock(latch_);
-  if (set_evictable) {
-    curr_size_++;
-  } else {
+  if (!set_evictable) {
     if (non_evictale_.size() > replacer_size_) {
       throw std::logic_error(std::string("too many non_evictable page"));
     }
@@ -118,7 +115,6 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
       non_evictale_.insert(std::pair(buff_iter->first, buff_iter->second->second));
       buffer_.erase(buff_iter->second);
       buffer_map_.erase(buff_iter);
-      curr_size_--;
     }
     return;
   }
@@ -128,7 +124,6 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
       non_evictale_.insert(std::pair(his_iter->first, his_iter->second->second));
       history_.erase(his_iter->second);
       history_map_.erase(his_iter);
-      curr_size_--;
     }
     return;
   }

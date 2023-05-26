@@ -99,8 +99,8 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   size_t dir_index;
   std::shared_ptr<Bucket> target_bucket;
   V val;
-  if(dir_[IndexOf(key)]->Find(key, val)) {
-    dir_[IndexOf(key)]->Insert(key, value);\
+  if (dir_[IndexOf(key)]->Find(key, val)) {
+    dir_[IndexOf(key)]->Insert(key, value);
     return;
   }
   while (dir_[IndexOf(key)]->IsFull()) {
@@ -182,7 +182,9 @@ auto ExtendibleHashTable<K, V>::Bucket::Insert(const K &key, const V &value) -> 
       return true;
     }
   }
-  if(IsFull()) { return false; }
+  if (IsFull()) {
+    return false;
+  }
   list_.emplace_back(std::pair(key, value));
   return true;
 }
