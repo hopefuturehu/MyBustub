@@ -136,7 +136,6 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
 auto BufferPoolManagerInstance::AllocatePage() -> page_id_t { return next_page_id_++; }
 
 auto BufferPoolManagerInstance::GetAvailableFrame(frame_id_t *out_frame_id) -> bool {
-  std::scoped_lock<std::mutex> lock(latch_);
   frame_id_t fid;
   if (!free_list_.empty()) {
     fid = free_list_.front();
