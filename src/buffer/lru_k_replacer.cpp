@@ -18,21 +18,27 @@ LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_fra
 
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
   std::scoped_lock<std::mutex> lock(latch_);
-  if (history_.empty() && buffer_.empty()) {
-    return false;
+  for(auto iter = history_.rbegin(); iter != history_.rend(); iter++) {
+    if(non_evictale_[iter->first]){
+      non_evictale_.erase(iter->first);
+      *frame_id = iter->first;
+      history_map_.erase(iter->first);
+      history_.remove(*iter);
+      curr_size_--;
+      return true;
+    }
   }
-  if (history_.empty()) {
-    auto del_frame = std::prev(buffer_.end());
-    *frame_id = del_frame->first;
-    buffer_map_.erase(del_frame->first);
-    buffer_.pop_back();
-  } else {
-    auto del_frame = std::prev(history_.end());
-    *frame_id = del_frame->first;
-    history_map_.erase(del_frame->first);
-    history_.pop_back();
+  for(auto iter = buffer_.rbegin(); iter != buffer_.rend(); iter++) {
+    if(non_evictale_[iter->first]){
+      *frame_id = iter->first;
+      non_evictale_.erase((iter->first));
+      buffer_map_.erase(iter->first);
+      buffer_.remove(*iter);
+      curr_size_--;
+      return true;
+    }
   }
-  return true;
+  return false;
 }
 
 void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
@@ -41,11 +47,6 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
     throw std::logic_error(std::string("Invalid framed_id") + std::to_string(frame_id));
   }
   current_timestamp_++;
-  if (non_evictale_.find(frame_id) != non_evictale_.end()) {
-    auto iter = non_evictale_.find(frame_id);
-    iter->second = current_timestamp_;
-    return;
-  }
   auto iter = buffer_map_.find(frame_id);
   if (iter != buffer_map_.end()) {
     buffer_.splice(buffer_.begin(), buffer_, iter->second);
@@ -57,11 +58,6 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
     iter->second->second++;
     if (iter->second->second >= k_) {
       iter->second->second = current_timestamp_;
-      while (buffer_map_.size() + non_evictale_.size() >= replacer_size_) {
-        frame_id_t del_frame = std::prev(buffer_.end())->first;
-        buffer_.pop_back();
-        buffer_map_.erase(del_frame);
-      }
       buffer_.splice(buffer_.begin(), buffer_, iter->second);
       buffer_map_.insert(std::pair(iter->first, iter->second));
       history_map_.erase(iter->first);
@@ -81,52 +77,56 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   }
   history_.push_front(std::pair(frame_id, 1));
   history_map_.insert(std::pair(frame_id, history_.begin()));
+  non_evictale_.insert(std::pair(frame_id, true));
+  curr_size_++;
 }
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   std::scoped_lock<std::mutex> lock(latch_);
-  if (!set_evictable) {
-    if (non_evictale_.size() > replacer_size_) {
-      throw std::logic_error(std::string("too many non_evictable page"));
-    }
+  assert(non_evictale_.find(frame_id) != non_evictale_.end());
+  if(set_evictable && !non_evictale_[frame_id]) {
+    curr_size_++;
   }
-  auto ne_iter = non_evictale_.find(frame_id);
-  if (ne_iter != non_evictale_.end()) {
-    if (!set_evictable) {
-      return;
-    }  // put page back to buffer_list]
-    for (auto ind = buffer_.begin(); ind != buffer_.end(); ind++) {
-      if (ind->second < ne_iter->second) {
-        buffer_.insert(ind, std::pair(frame_id, ne_iter->second));
-        ind--;
-        buffer_map_.insert(std::pair(frame_id, ind));
-        non_evictale_.erase(frame_id);
-        return;
-      }
-    }
-    buffer_.emplace_back(std::pair(ne_iter->first, ne_iter->second));
-    buffer_map_.insert(std::pair(ne_iter->first, std::prev(buffer_.end())));
-    non_evictale_.erase(frame_id);
-    return;
+  else if (!set_evictable && non_evictale_[frame_id]) {
+    curr_size_--;
   }
-  auto buff_iter = buffer_map_.find(frame_id);
-  if (buff_iter != buffer_map_.end()) {
-    if (!set_evictable) {
-      non_evictale_.insert(std::pair(buff_iter->first, buff_iter->second->second));
-      buffer_.erase(buff_iter->second);
-      buffer_map_.erase(buff_iter);
-    }
-    return;
-  }
-  auto his_iter = history_map_.find(frame_id);
-  if (his_iter != history_map_.end()) {
-    if (!set_evictable) {
-      non_evictale_.insert(std::pair(his_iter->first, his_iter->second->second));
-      history_.erase(his_iter->second);
-      history_map_.erase(his_iter);
-    }
-    return;
-  }
+  non_evictale_[frame_id] = set_evictable;
+  // if (ne_iter != non_evictale_.end()) {
+  //   if (!set_evictable) {
+  //     return;
+  //   }  // put page back to buffer_list]
+  //   for (auto ind = buffer_.begin(); ind != buffer_.end(); ind++) {
+  //     if (ind->second < ne_iter->second) {
+  //       buffer_.insert(ind, std::pair(frame_id, ne_iter->second));
+  //       ind--;
+  //       buffer_map_.insert(std::pair(frame_id, ind));
+  //       non_evictale_.erase(frame_id);
+  //       return;
+  //     }
+  //   }
+  //   buffer_.emplace_back(std::pair(ne_iter->first, ne_iter->second));
+  //   buffer_map_.insert(std::pair(ne_iter->first, std::prev(buffer_.end())));
+  //   non_evictale_.erase(frame_id);
+  //   return;
+  // }
+  // auto buff_iter = buffer_map_.find(frame_id);
+  // if (buff_iter != buffer_map_.end()) {
+  //   if (!set_evictable) {
+  //     non_evictale_.insert(std::pair(buff_iter->first, buff_iter->second->second));
+  //     buffer_.erase(buff_iter->second);
+  //     buffer_map_.erase(buff_iter);
+  //   }
+  //   return;
+  // }
+  // auto his_iter = history_map_.find(frame_id);
+  // if (his_iter != history_map_.end()) {
+  //   if (!set_evictable) {
+  //     non_evictale_.insert(std::pair(his_iter->first, his_iter->second->second));
+  //     history_.erase(his_iter->second);
+  //     history_map_.erase(his_iter);
+  //   }
+  //   return;
+  // }
 }
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
@@ -151,7 +151,7 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {
 
 auto LRUKReplacer::Size() -> size_t {
   std::scoped_lock<std::mutex> lock(latch_);
-  return buffer_.size() + history_.size();
+  return curr_size_;
 }
 
 }  // namespace bustub
