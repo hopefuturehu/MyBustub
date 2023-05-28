@@ -64,27 +64,6 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
     }
     return;
   }
-  // while (history_.size() + buffer_.size() >= replacer_size_) {
-  //   if (!history_.empty()) {
-  //     for (auto iter = history_.rbegin(); iter != history_.rend(); iter++) {
-  //       if (non_evictale_[iter->first]) {
-  //         non_evictale_.erase(iter->first);
-  //         history_map_.erase(iter->first);
-  //         history_.remove(*iter);
-  //         curr_size_--;
-  //       }
-  //     }
-  //   } else {
-  //     for (auto iter = buffer_.rbegin(); iter != buffer_.rend(); iter++) {
-  //       if (non_evictale_[iter->first]) {
-  //         non_evictale_.erase((iter->first));
-  //         buffer_map_.erase(iter->first);
-  //         buffer_.remove(*iter);
-  //         curr_size_--;
-  //       }
-  //     }
-  //   }
-  // }
   history_.push_front(std::pair(frame_id, 1));
   history_map_.insert(std::pair(frame_id, history_.begin()));
   non_evictale_.insert(std::pair(frame_id, true));
@@ -93,7 +72,13 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   std::scoped_lock<std::mutex> lock(latch_);
-  assert(non_evictale_.find(frame_id) != non_evictale_.end());
+  if (frame_id > static_cast<int>(replacer_size_)) {
+    throw std::logic_error(std::string("Invalid framed_id in SetEvictable") + std::to_string(frame_id));
+  }
+  // assert(non_evictale_.find(frame_id) != non_evictale_.end());
+  if (non_evictale_.find(frame_id) == non_evictale_.end()) {
+    return;
+  }
   if (set_evictable && !non_evictale_[frame_id]) {
     curr_size_++;
   } else if (!set_evictable && non_evictale_[frame_id]) {

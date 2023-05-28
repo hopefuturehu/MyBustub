@@ -178,6 +178,14 @@ class BufferPoolManagerInstance : public BufferPoolManager {
 
   // TODO(student): You may add additional private members and helper functions
  private:
+  /**
+   * @brief Get the Available Frame object. First find page in free_list.
+   * If free_list is empty, evict a old page from replacer.
+   * If the old page is dirty, write it to disk and reset it's memory.
+   * @param[out] out_frame_id the id or available frame
+   * @return true
+   * @return false
+   */
   auto GetAvailableFrame(frame_id_t *out_frame_id) -> bool;
 };
 }  // namespace bustub

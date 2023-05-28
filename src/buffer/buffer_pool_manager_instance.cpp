@@ -45,7 +45,6 @@ auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
     page_table_->Insert(*page_id, frame_id);
     pages_[frame_id].page_id_ = *page_id;
     pages_[frame_id].pin_count_ = 1;
-
     replacer_->RecordAccess(frame_id);
     replacer_->SetEvictable(frame_id, false);
 
@@ -58,19 +57,16 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
   std::scoped_lock<std::mutex> lock(latch_);
   frame_id_t frame_id;
   if (page_table_->Find(page_id, frame_id)) {
-    if (pages_[frame_id].IsDirty()) {
-      disk_manager_->WritePage(pages_[frame_id].page_id_, pages_[frame_id].data_);
-    }
     replacer_->RecordAccess(frame_id);
     replacer_->SetEvictable(frame_id, false);
-    disk_manager_->ReadPage(pages_[frame_id].page_id_, pages_[frame_id].data_);
-    pages_[frame_id].pin_count_ = 1;
+    pages_[frame_id].pin_count_++;
     return &pages_[frame_id];
   }
   if (GetAvailableFrame(&frame_id)) {
     page_table_->Insert(page_id, frame_id);
     replacer_->RecordAccess(frame_id);
     replacer_->SetEvictable(frame_id, false);
+    pages_[frame_id].page_id_ = page_id;
     disk_manager_->ReadPage(pages_[frame_id].page_id_, pages_[frame_id].data_);
     pages_[frame_id].pin_count_ = 1;
     return &pages_[frame_id];
@@ -126,7 +122,8 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
     if (pages_[frame_id].pin_count_ > 0) {
       return false;
     }
-
+    DeallocatePage(page_id);
+    pages_[frame_id].ResetMemory();
     page_table_->Remove(page_id);
     free_list_.emplace_back(frame_id);
   }
