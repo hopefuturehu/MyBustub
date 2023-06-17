@@ -21,7 +21,9 @@ BPLUSTREE_TYPE::BPlusTree(std::string name, BufferPoolManager *buffer_pool_manag
  * Helper function to decide whether current b+tree is empty
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return true; }
+auto BPLUSTREE_TYPE::IsEmpty() const -> bool {
+  return root_page_id_ == 0;
+}
 /*****************************************************************************
  * SEARCH
  *****************************************************************************/
@@ -32,6 +34,14 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return true; }
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction) -> bool {
+  auto leaf_page = GetLeafPage(key);
+  auto leaf_node = reinterpret_cast<LeafPage*>(leaf_page);
+  ValueType V;
+  bool nil = leaf_node->LookUp(key, V, comparator_);
+  if(nil){
+    result->push_back(V);
+    return true;
+  }
   return false;
 }
 
@@ -39,6 +49,7 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
  * INSERTION
  *****************************************************************************/
 /*
+
  * Insert constant key & value pair into b+ tree
  * if current tree is empty, start new tree, update root page id and insert
  * entry, otherwise insert into leaf page.
@@ -118,6 +129,21 @@ void BPLUSTREE_TYPE::UpdateRootPageId(int insert_record) {
     header_page->UpdateRecord(index_name_, root_page_id_);
   }
   buffer_pool_manager_->UnpinPage(HEADER_PAGE_ID, true);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE:: GetLeafPage (const KeyType &value) const -> Page * {
+  page_id_t leaf_id = root_page_id_;
+  while(true) {
+    Page *page  = buffer_pool_manager_->FetchPage(leaf_id);
+    auto tree_page = reinterpret_cast<BPlusTreePage *>(page->GetData());
+    if(tree_page->IsLeafPage()) {
+      return page;
+    }
+    //此时tree_node 其实是internal_ndoe, 那么就向下遍历
+    auto i_node = reinterpret_cast<InternalPage *>(tree_page);
+    leaf_id = i_node->LookUp(value, comparator_);
+  }
 }
 
 /*
