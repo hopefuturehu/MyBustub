@@ -63,7 +63,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const -> KeyType {
 
 */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::LookUp(const KeyType K, ValueType &V, const KeyComparator &comparator) const -> bool {
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::LookUp(const KeyType &K, ValueType &V, const KeyComparator &comparator) const -> bool {
   int l = 0;
   int r = GetSize();
   if(l >= r) {
@@ -86,6 +86,26 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::LookUp(const KeyType K, ValueType &V, const Key
     return true;
   }
   return false;
+}
+
+// 默认Insert不会插入重复值
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &K, const ValueType &V, const KeyComparator &comparator) const -> bool {
+  int l = 0;
+  int r = GetSize();
+  if(l < r) {
+    *(array_ + r) = {K, V};
+  } else {
+    while(l < r) {
+      int mid = (l + r) / 2;
+      if(comparator(array_[mid].first, K) < 0) {
+        l = mid + 1;
+      } else {
+        r = mid;
+      }
+    }
+  }
+
 }
 
 template class BPlusTreeLeafPage<GenericKey<4>, RID, GenericComparator<4>>;

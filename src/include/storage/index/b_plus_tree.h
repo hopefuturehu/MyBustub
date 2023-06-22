@@ -76,6 +76,10 @@ class BPlusTree {
 
  private:
   auto GetLeafPage (const KeyType &value) const -> Page *; 
+
+  auto InsertIntoLeaf(const KeyType &key, const ValueType &value) const -> bool;
+
+  void StartNewTree(const KeyType &key, const ValueType & value);
   
   void UpdateRootPageId(int insert_record = 0);
 

@@ -22,7 +22,7 @@ BPLUSTREE_TYPE::BPlusTree(std::string name, BufferPoolManager *buffer_pool_manag
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::IsEmpty() const -> bool {
-  return root_page_id_ == 0;
+  return root_page_id_ == INVALID_PAGE_ID;
 }
 /*****************************************************************************
  * SEARCH
@@ -36,10 +36,14 @@ INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction) -> bool {
   auto leaf_page = GetLeafPage(key);
   auto leaf_node = reinterpret_cast<LeafPage*>(leaf_page);
-  ValueType V;
-  bool nil = leaf_node->LookUp(key, V, comparator_);
+  ValueType v;
+
+  leaf_page->RUnlatch();
+  buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
+
+  bool nil = leaf_node->LookUp(key, v, comparator_);
   if(nil){
-    result->push_back(V);
+    result->push_back(v);
     return true;
   }
   return false;
@@ -58,6 +62,10 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) -> bool {
+  if(IsEmpty()){
+    StartNewTree(key, value);
+    return true;
+  }
   return false;
 }
 
@@ -108,6 +116,59 @@ INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t { return 0; }
 
 /*****************************************************************************
+ * CUSTOM
+ *****************************************************************************/
+/**
+ * this method to get the leaf_page to key
+ * @return true if find the value of the key, false not find
+ * @param v: value of the key
+*/
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE:: GetLeafPage (const KeyType &key) const -> Page * {
+  page_id_t leaf_id = root_page_id_;
+  while(true) {
+    Page *page  = buffer_pool_manager_->FetchPage(leaf_id);
+    auto tree_page = reinterpret_cast<BPlusTreePage *>(page->GetData());
+    if(tree_page->IsLeafPage()) {
+      return page;
+    }
+    //此时tree_node 其实是internal_ndoe, 那么就向下遍历
+    auto i_node = reinterpret_cast<InternalPage *>(tree_page);
+    leaf_id = i_node->LookUp(key, comparator_);
+  }
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value) const -> bool{
+  Page *leaf_page = GetLeafPage(key);
+  auto *page = reinterpret_cast<LeafPage *>(leaf_page->GetData());
+  ValueType val;
+// 查找重复值，有重复值那就扔个false回去
+  if(page->LookUp(key, val, comparator_)) {
+    buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
+    return false; // 查找重复值，有重复值那就扔个false回去
+  }
+  page->Insert(key, value, comparator_);
+  if(page->GetSize() >= page->GetMaxSize()){
+    
+  }
+  buffer_pool_manager_->UnpinPage(page->GetPageId(), true);
+  return true;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType & value){
+  auto buffer_page = buffer_pool_manager_->NewPage(&root_page_id_);
+  if(buffer_page == nullptr){
+    throw Exception(ExceptionType::OUT_OF_MEMORY, "CAN'T BUILD A NEW TREE");
+  }
+  auto root_page = reinterpret_cast<LeafPage *>(buffer_page);
+  root_page->Init(root_page_id_, INVALID_PAGE_ID, leaf_max_size_);
+  root_page ->Insert(key, value, comparator_);
+  buffer_pool_manager_->UnpinPage(root_page_id_, true);
+  UpdateRootPageId(1);
+}
+/*****************************************************************************
  * UTILITIES AND DEBUG
  *****************************************************************************/
 /*
@@ -129,21 +190,6 @@ void BPLUSTREE_TYPE::UpdateRootPageId(int insert_record) {
     header_page->UpdateRecord(index_name_, root_page_id_);
   }
   buffer_pool_manager_->UnpinPage(HEADER_PAGE_ID, true);
-}
-
-INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE:: GetLeafPage (const KeyType &value) const -> Page * {
-  page_id_t leaf_id = root_page_id_;
-  while(true) {
-    Page *page  = buffer_pool_manager_->FetchPage(leaf_id);
-    auto tree_page = reinterpret_cast<BPlusTreePage *>(page->GetData());
-    if(tree_page->IsLeafPage()) {
-      return page;
-    }
-    //此时tree_node 其实是internal_ndoe, 那么就向下遍历
-    auto i_node = reinterpret_cast<InternalPage *>(tree_page);
-    leaf_id = i_node->LookUp(value, comparator_);
-  }
 }
 
 /*
