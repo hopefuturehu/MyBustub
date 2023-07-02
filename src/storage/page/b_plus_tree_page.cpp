@@ -27,6 +27,13 @@ void BPlusTreePage::SetPageType(IndexPageType page_type) {
     page_type_ = page_type;
 }
 
+
+auto BPlusTreePage::GetPageType() const -> IndexPageType {
+    return page_type_;
+}
+
+
+
 /*
  * Helper methods to get/set size (number of key/value pairs stored in that
  * page)

@@ -77,7 +77,11 @@ class BPlusTree {
  private:
   auto GetLeafPage (const KeyType &value) const -> Page *; 
 
-  auto InsertIntoLeaf(const KeyType &key, const ValueType &value) const -> bool;
+  auto InsertIntoLeaf(const KeyType &key, const ValueType &value) -> bool;
+
+  void InsertIntoParent(BPlusTreePage *old_node, const KeyType &key, BPlusTreePage *new_node);
+  template <typename N>
+  auto Split(N *node) -> N * ;
 
   void StartNewTree(const KeyType &key, const ValueType & value);
   

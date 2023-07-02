@@ -28,8 +28,9 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, int max_size) {
  this->SetMaxSize(max_size);
  this->SetPageId(page_id);
- this->SetParentPageId(page_id);
+ this->SetParentPageId(parent_id);
  this->SetSize(0);
+ this->SetPageType(IndexPageType::INTERNAL_PAGE);
 }
 /*
  * Helper method to get/set the key associated with input "index"(a.k.a
@@ -61,6 +62,9 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::LookUp(KeyType K, const KeyComparator &comp
     if(l >= r) {
       return r;
     }
+    // if(comp(array_[0].first, K) >= 0) {
+    //   return array_[0].second;
+    // }
     while(l < r) {
       int mid = (l + r) / 2;
       if(comp(array_[mid].first, K) < 0) {
@@ -69,7 +73,59 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::LookUp(KeyType K, const KeyComparator &comp
         r = mid;
       }
     }
-    return l;
+    return array_[r - 1].second;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetValueAt(int index, const ValueType &value) { array_[index].second = value; }
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::PopulateNewRoot(const ValueType &old_value, const KeyType &new_key,
+                                                     const ValueType &new_value) {
+  SetKeyAt(1, new_key);
+  SetValueAt(0, old_value);
+  SetValueAt(1, new_value);
+  SetSize(2);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAt(const ValueType &old_value, const KeyType &new_key, const ValueType &new_value) -> int
+{
+  auto new_value_idx = ValueIndex(old_value) + 1;
+  std::move_backward(array_ + new_value_idx , array_ + GetSize(), array_ + GetSize() + 1);
+
+  array_[new_value_idx].first = new_key;
+  array_[new_value_idx].second = new_value;
+  IncreaseSize(1);
+  return GetSize();
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(const ValueType &value) const -> int {
+  auto it = std::find_if(array_, array_ + GetSize(), [&value](const auto &pair) { return pair.second == value; });
+  return std::distance(array_, it);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage *recipient, BufferPoolManager *buffer_pool_manager) {
+  int start_split_indx = GetMinSize();
+  int original_size = GetSize();
+  SetSize(start_split_indx);
+  recipient->CopyNFrom(array_ + start_split_indx, original_size - start_split_indx, buffer_pool_manager);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyNFrom(MappingType *items, int size, BufferPoolManager *buffer_pool_manager) {
+  std::copy(items, items + size, array_ + GetSize());
+
+  for (int i = 0; i < size; i++) {
+    auto page = buffer_pool_manager->FetchPage(ValueAt(i + GetSize()));
+    auto *node = reinterpret_cast<BPlusTreePage *>(page->GetData());
+    node->SetParentPageId(GetPageId());
+    buffer_pool_manager->UnpinPage(page->GetPageId(), true);
+  }
+
+  IncreaseSize(size);
 }
 
 // valuetype for internalNode should be page id_t
