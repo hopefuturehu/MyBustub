@@ -52,16 +52,16 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto LookUp(const KeyType &K, ValueType &V, const KeyComparator &comparator) const -> bool;
   auto Insert(const KeyType &K, const ValueType &V, const KeyComparator &comparator) -> bool;
   auto KeyInd(const KeyType &K, const KeyComparator &comparator) -> int;
-  void MoveNTo(BPlusTreeLeafPage * recip, int n, bool pos);
+  void MoveNTo(BPlusTreeLeafPage *recip, int n, bool pos);
   void MoveHalfTo(BPlusTreeLeafPage *recip);
-  auto GetItem(int index) -> const MappingType&;
+  auto GetItem(int index) -> const MappingType &;
   void CopyN(MappingType *items, int size);
 
   auto Remove(const KeyType &K, const KeyComparator &comp) -> bool;
   void MoveFirstToEndOf(BPlusTreeLeafPage *recipient);
   void MoveLastToFrontOf(BPlusTreeLeafPage *recipient);
   void MoveAllTo(BPlusTreeLeafPage *recipient);
-  
+
  private:
   void CopyLastFrom(const MappingType &item);
   void CopyFirstFrom(const MappingType &item);

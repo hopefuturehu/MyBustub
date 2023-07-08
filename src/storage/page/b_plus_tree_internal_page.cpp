@@ -26,56 +26,50 @@ namespace bustub {
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, int max_size) {
- this->SetMaxSize(max_size);
- this->SetPageId(page_id);
- this->SetParentPageId(parent_id);
- this->SetSize(0);
- this->SetPageType(IndexPageType::INTERNAL_PAGE);
+  this->SetMaxSize(max_size);
+  this->SetPageId(page_id);
+  this->SetParentPageId(parent_id);
+  this->SetSize(0);
+  this->SetPageType(IndexPageType::INTERNAL_PAGE);
 }
 /*
  * Helper method to get/set the key associated with input "index"(a.k.a
  * array offset)
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const -> KeyType {
-  return array_[index].first;
-}
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const -> KeyType { return array_[index].first; }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) {
-  array_[index].first = key;
-}
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) { array_[index].first = key; }
 
 /*
  * Helper method to get the value associated with input "index"(a.k.a array
  * offset)
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const -> ValueType {
-  return array_[index].second;
-}
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const -> ValueType { return array_[index].second; }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::LookUp(KeyType K, const KeyComparator &comp) const -> page_id_t{
-    int l = 0;
-    int r = GetSize();
-    if(l >= r) {
-      return r;
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::LookUp(KeyType K, const KeyComparator &comp) const -> page_id_t {
+  int l = 0;
+  int r = GetSize();
+  if (l >= r) {
+    return r;
+  }
+  // if(comp(array_[0].first, K) >= 0) {
+  //   return array_[0].second;
+  // }
+  while (l < r) {
+    int mid = (l + r) / 2;
+    if (comp(array_[mid].first, K) < 0) {
+      l = mid + 1;
+    } else if (comp(array_[mid].first, K) == 0) {
+      return array_[mid].second;
+    } else {
+      r = mid;
     }
-    // if(comp(array_[0].first, K) >= 0) {
-    //   return array_[0].second;
-    // }
-    while(l < r) {
-      int mid = (l + r) / 2;
-      if(comp(array_[mid].first, K) < 0) {
-        l = mid + 1;
-      } else if(comp(array_[mid].first, K) == 0) {
-        return array_[mid].second;
-      } else {
-        r = mid;
-      }
-    }
-    return array_[r - 1].second;
+  }
+  return array_[r - 1].second;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -91,10 +85,10 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::PopulateNewRoot(const ValueType &old_value,
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAt(const ValueType &old_value, const KeyType &new_key, const ValueType &new_value) -> int
-{
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAt(const ValueType &old_value, const KeyType &new_key,
+                                                  const ValueType &new_value) -> int {
   auto new_value_idx = ValueIndex(old_value) + 1;
-  std::move_backward(array_ + new_value_idx , array_ + GetSize(), array_ + GetSize() + 1);
+  std::move_backward(array_ + new_value_idx, array_ + GetSize(), array_ + GetSize() + 1);
 
   array_[new_value_idx].first = new_key;
   array_[new_value_idx].second = new_value;
@@ -109,7 +103,8 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(const ValueType &value) const ->
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage *recipient, BufferPoolManager *buffer_pool_manager) {
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage *recipient,
+                                                BufferPoolManager *buffer_pool_manager) {
   int start_split_indx = GetMinSize();
   int original_size = GetSize();
   SetSize(start_split_indx);

@@ -40,28 +40,20 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, in
  * Helper methods to set/get next page id
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetNextPageId() const -> page_id_t { 
-  return next_page_id_;
-}
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetNextPageId() const -> page_id_t { return next_page_id_; }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {
-  next_page_id_ = next_page_id;
-}
+void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) { next_page_id_ = next_page_id; }
 
 /*
  * Helper method to find and return the key associated with input "index"(a.k.a
  * array offset)
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const -> KeyType {
-  return array_[index].first;
-}
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const -> KeyType { return array_[index].first; }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) -> const MappingType& {
-  return array_[index];
-}
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) -> const MappingType & { return array_[index]; }
 
 /*
  * helper method to get value of key
@@ -72,46 +64,45 @@ INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::LookUp(const KeyType &K, ValueType &V, const KeyComparator &comparator) const -> bool {
   int l = 0;
   int r = GetSize();
-  if(l >= r) {
-    if(comparator(array_[r].first, K) == 0){
+  if (l >= r) {
+    if (comparator(array_[r].first, K) == 0) {
       V = array_[r].second;
       return true;
     }
     return false;
   }
-  while(l < r) {
+  while (l < r) {
     int mid = (l + r) / 2;
-    if(comparator(array_[mid].first, K) < 0) {
+    if (comparator(array_[mid].first, K) < 0) {
       l = mid + 1;
     } else {
       r = mid;
     }
   }
-  if(comparator(array_[r].first, K) == 0 && r < GetSize()){
+  if (comparator(array_[r].first, K) == 0 && r < GetSize()) {
     V = array_[r].second;
     return true;
   }
   return false;
 }
-//二分查找Index，调用lower_bound
+//  二分查找Index，调用lower_bound
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyInd(const KeyType &K, const KeyComparator &comparator) -> int {
-  auto target = std::lower_bound(array_, array_ + GetSize(), K, [&comparator](const auto &pair, auto k) {
-    return comparator(pair.first, k) < 0;
-  });
+  auto target = std::lower_bound(array_, array_ + GetSize(), K,
+                                 [&comparator](const auto &pair, auto k) { return comparator(pair.first, k) < 0; });
   return std::distance(array_, target);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &K, const ValueType &V, const KeyComparator &comparator) -> bool {
   auto dis = KeyInd(K, comparator);
-  if(dis == GetSize()) {
+  if (dis == GetSize()) {
     *(array_ + dis) = {K, V};
     IncreaseSize(1);
     return true;
   }
-  if(comparator(array_[dis].first, K) == 0) {
-    return false; //重复键值返回插入错误
+  if (comparator(array_[dis].first, K) == 0) {
+    return false;  //  重复键值返回插入错误
   }
 
   std::move_backward(array_ + dis, array_ + GetSize(), array_ + GetSize() + 1);
@@ -122,22 +113,21 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &K, const ValueType &V, co
 
 INDEX_TEMPLATE_ARGUMENTS
 /**
- * @brief 
- * 
+ * @brief
+ *
  * @param K key
- * @param comparator 
+ * @param comparator
  * @return true if remove success
- * @return false 
+ * @return false
  */
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::Remove(const KeyType &K, const KeyComparator &comparator) -> bool {
   int index = KeyInd(K, comparator);
-  if(index == GetSize() || comparator(array_[index].first, K) != 0) {
+  if (index == GetSize() || comparator(array_[index].first, K) != 0) {
     return false;
   }
   std::move(array_ + index + 1, array_ + GetSize(), array_ + index);
   IncreaseSize(-1);
   return true;
-
 }
 
 INDEX_TEMPLATE_ARGUMENTS
