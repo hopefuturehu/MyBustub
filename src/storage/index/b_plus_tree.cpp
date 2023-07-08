@@ -35,7 +35,7 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool {
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction) -> bool {
   auto leaf_page = GetLeafPage(key);
-  auto leaf_node = reinterpret_cast<LeafPage*>(leaf_page);
+  auto leaf_node = reinterpret_cast<LeafPage*>(leaf_page->GetData());
   ValueType v;
 
   leaf_page->RUnlatch();
@@ -80,8 +80,130 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
  * necessary.
  */
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {}
+void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
+  if(IsEmpty()) {
+    return;
+  }
 
+  auto leaf_page = GetLeafPage(key);
+  auto leaf_node = reinterpret_cast<LeafPage*>(leaf_page->GetData());
+
+  bool delete_flag = leaf_node->Remove(key, comparator_);
+  if(!delete_flag){ // remove failed
+    buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
+    return;
+  }
+  if(leaf_node->GetSize() >= leaf_node->GetMinSize()) {
+    buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
+    return;
+  }
+  CoalesceOrRedistribute(leaf_node);
+  buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+template <typename N>
+auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node) -> bool {
+  if(node->IsRootPage()) { //根节点的一些特殊处理
+    if(node->IsLeafPage() && node->GetSize() == 0) {
+      root_page_id_ = INVALID_PAGE_ID;
+      return true;
+    }
+    if(!node->IsLeafPage() && node->GetSize() == 1) {
+      auto *root_node = reinterpret_cast<InternalPage *>(node);
+      auto root_child_page = buffer_pool_manager_->FetchPage(root_node->ValueAt(0));
+      auto root_child_node = reinterpret_cast<BPlusTreePage *>(root_child_page->GetData());
+      root_child_node->SetParentPageId(INVALID_PAGE_ID);
+      root_page_id_ = root_child_node->GetPageId();
+      UpdateRootPageId(0);
+      buffer_pool_manager_->UnpinPage(root_child_node->GetPageId(), true);
+      return true;
+    }
+    return false;
+  }
+  auto parent_page = buffer_pool_manager_->FetchPage(node->GetParentPageId());
+  auto parent_node = reinterpret_cast<InternalPage*>(parent_page->GetData());
+  auto node_index = parent_node->ValueIndex(node->GetPageId());
+  //尝试借值
+  if(node_index > 0) { //左边
+    auto left_bro_page = buffer_pool_manager_->FetchPage(parent_node->ValueAt(node_index - 1));
+    if(node->IsLeafPage()) {
+      auto left_bro_node = reinterpret_cast<LeafPage * >(left_bro_page->GetData());
+      auto leaf_node = reinterpret_cast<LeafPage * >(node);
+      if(left_bro_node->GetSize() > left_bro_node->GetMinSize()) { 
+        left_bro_node->MoveLastToFrontOf(leaf_node);
+        parent_node->SetKeyAt(node_index, leaf_node->KeyAt(0));
+        buffer_pool_manager_->UnpinPage(left_bro_page->GetPageId(), true);
+        buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);
+        return true;
+      }
+    } else {
+      auto internal_node = reinterpret_cast<InternalPage *>(node);
+      auto left_bro_node = reinterpret_cast<InternalPage *>(left_bro_page->GetData());
+      if(left_bro_node->GetSize() > left_bro_node->GetMinSize()) {
+        left_bro_node->MoveLastToFrontOf(internal_node, parent_node->KeyAt(node_index), buffer_pool_manager_);
+        parent_node->SetKeyAt(node_index, internal_node->KeyAt(0));
+        buffer_pool_manager_->UnpinPage(left_bro_page->GetPageId(), true);
+        buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);
+        return true;
+      }
+    }
+
+  } else if (node_index != parent_node->GetSize() - 1) { //右边
+    auto right_bro_page = buffer_pool_manager_->FetchPage(parent_node->ValueAt(node_index + 1));
+    if(node->IsLeafPage()) {
+      auto leaf_node = reinterpret_cast<LeafPage *>(node);
+      auto right_bro_node = reinterpret_cast<LeafPage * >(right_bro_page->GetData());
+      if(right_bro_node->GetSize() > right_bro_node->GetMinSize()) {
+        right_bro_node->MoveFirstToEndOf(leaf_node);
+        parent_node->SetKeyAt(node_index + 1, right_bro_node->KeyAt(0));
+        buffer_pool_manager_->UnpinPage(right_bro_page->GetPageId(), true);
+        buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);        
+        return true;
+      }
+    } else {
+      auto internal_node = reinterpret_cast<InternalPage *>(node);
+      auto right_bro_node = reinterpret_cast<InternalPage *>(right_bro_page);
+      if(right_bro_node->GetSize() > right_bro_node->GetMinSize()) {
+        right_bro_node->MoveFirstToEndOf(internal_node, parent_node->KeyAt(node_index + 1), buffer_pool_manager_);
+        parent_node->SetKeyAt(node_index + 1, right_bro_node->KeyAt(0));
+        buffer_pool_manager_->UnpinPage(right_bro_page->GetPageId(), true);
+        buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);        
+        return true;
+      }
+    }
+  }
+  // 再尝试合并，统一向左合并
+  if(node_index > 0) { //左边
+    auto left_bro_page = buffer_pool_manager_->FetchPage(parent_node->ValueAt(node_index - 1));
+    if(node->IsLeafPage()) {
+      auto left_bro_node = reinterpret_cast<LeafPage * >(left_bro_page->GetData());
+      auto leaf_node = reinterpret_cast<LeafPage * >(node);
+      leaf_node->MoveAllTo(left_bro_node);
+    } else {
+      auto internal_node = reinterpret_cast<InternalPage *>(node);
+      auto left_bro_node = reinterpret_cast<InternalPage *>(left_bro_page->GetData());
+      internal_node->MoveAllTo(left_bro_node, parent_node->KeyAt(node_index - 1), buffer_pool_manager_);
+    }
+    parent_node->Remove(node_index);
+    return CoalesceOrRedistribute(parent_node);
+  }
+  if (node_index != parent_node->GetSize() - 1) { //右边
+    auto right_bro_page = buffer_pool_manager_->FetchPage(parent_node->ValueAt(node_index + 1));
+    if(node->IsLeafPage()) {
+      auto leaf_node = reinterpret_cast<LeafPage *>(node);
+      auto right_bro_node = reinterpret_cast<LeafPage * >(right_bro_page->GetData());
+      right_bro_node->MoveAllTo(leaf_node);
+    } else {
+      auto internal_node = reinterpret_cast<InternalPage *>(node);
+      auto right_bro_node = reinterpret_cast<InternalPage *>(right_bro_page);
+      right_bro_node->MoveAllTo(internal_node, parent_node->KeyAt(node_index), buffer_pool_manager_);
+    }
+    parent_node->Remove(node_index + 1);
+    return CoalesceOrRedistribute(parent_node);
+  }
+  return false;
+}
 /*****************************************************************************
  * INDEX ITERATOR
  *****************************************************************************/
@@ -107,7 +229,7 @@ auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
   auto leaf_page = GetLeafPage(key);
-  auto leaf_node = reinterpret_cast<LeafPage*>(leaf_page);
+  auto leaf_node = reinterpret_cast<LeafPage*>(leaf_page->GetData());
   return INDEXITERATOR_TYPE(buffer_pool_manager_, leaf_page, leaf_node->KeyInd(key, comparator_));
 }
 
@@ -122,7 +244,7 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
     return INDEXITERATOR_TYPE(nullptr, nullptr);
   }
   auto root_page = buffer_pool_manager_->FetchPage(root_page_id_);
-  auto root_node = reinterpret_cast<InternalPage* >(root_page);
+  auto root_node = reinterpret_cast<InternalPage* >(root_page->GetData());
   auto key = root_node->KeyAt(root_node->GetSize() - 1);
   auto right_page = GetLeafPage(key);
   auto right_node = reinterpret_cast<LeafPage*>(right_page->GetData());
@@ -148,12 +270,12 @@ auto BPLUSTREE_TYPE:: GetLeafPage (const KeyType &key) const -> Page * {
   page_id_t leaf_id = root_page_id_;
   while(true) {
     Page *page  = buffer_pool_manager_->FetchPage(leaf_id);
-    auto tree_page = reinterpret_cast<BPlusTreePage *>(page->GetData());
-    if(tree_page->IsLeafPage()) {
+    auto tree_node = reinterpret_cast<BPlusTreePage *>(page->GetData());
+    if(tree_node->IsLeafPage()) {
       return page;
     }
     //此时tree_node 其实是internal_ndoe, 那么就向下遍历
-    auto i_node = reinterpret_cast<InternalPage *>(tree_page);
+    auto i_node = reinterpret_cast<InternalPage *>(tree_node);
     leaf_id = i_node->LookUp(key, comparator_);
   }
 }

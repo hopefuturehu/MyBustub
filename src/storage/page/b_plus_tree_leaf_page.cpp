@@ -87,7 +87,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::LookUp(const KeyType &K, ValueType &V, const Ke
       r = mid;
     }
   }
-  if(comparator(array_[r].first, K) == 0){
+  if(comparator(array_[r].first, K) == 0 && r < GetSize()){
     V = array_[r].second;
     return true;
   }
@@ -121,6 +121,54 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &K, const ValueType &V, co
 }
 
 INDEX_TEMPLATE_ARGUMENTS
+/**
+ * @brief 
+ * 
+ * @param K key
+ * @param comparator 
+ * @return true if remove success
+ * @return false 
+ */
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::Remove(const KeyType &K, const KeyComparator &comparator) -> bool {
+  int index = KeyInd(K, comparator);
+  if(index == GetSize() || comparator(array_[index].first, K) != 0) {
+    return false;
+  }
+  std::move(array_ + index + 1, array_ + GetSize(), array_ + index);
+  IncreaseSize(-1);
+  return true;
+
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveFirstToEndOf(BPlusTreeLeafPage *recipient) {
+  auto first_item = GetItem(0);
+  std::move(array_ + 1, array_ + GetSize(), array_);
+  IncreaseSize(-1);
+  recipient->CopyLastFrom(first_item);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyLastFrom(const MappingType &item) {
+  *(array_ + GetSize()) = item;
+  IncreaseSize(1);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveLastToFrontOf(BPlusTreeLeafPage *recipient) {
+  auto last_item = GetItem(GetSize() - 1);
+  IncreaseSize(-1);
+  recipient->CopyFirstFrom(last_item);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyFirstFrom(const MappingType &item) {
+  std::move_backward(array_, array_ + GetSize(), array_ + GetSize() + 1);
+  *array_ = item;
+  IncreaseSize(1);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recip) {
   int split_index = GetMinSize();
   SetSize(split_index);
@@ -131,6 +179,13 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyN(MappingType *items, int size) {
   std::copy(items, items + size, array_ + GetSize());
   IncreaseSize(size);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *recipient) {
+  recipient->CopyN(array_, GetSize());
+  recipient->SetNextPageId(GetNextPageId());
+  SetSize(0);
 }
 
 template class BPlusTreeLeafPage<GenericKey<4>, RID, GenericComparator<4>>;
