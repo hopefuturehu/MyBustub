@@ -147,8 +147,8 @@ auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node) -> bool {
         return true;
       }
     }
-
-  } else if (node_index != parent_node->GetSize() - 1) {  //  右边
+  }
+  if (node_index != parent_node->GetSize() - 1) {  //  右边
     auto right_bro_page = buffer_pool_manager_->FetchPage(parent_node->ValueAt(node_index + 1));
     if (node->IsLeafPage()) {
       auto leaf_node = reinterpret_cast<LeafPage *>(node);
@@ -182,7 +182,8 @@ auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node) -> bool {
     } else {
       auto internal_node = reinterpret_cast<InternalPage *>(node);
       auto left_bro_node = reinterpret_cast<InternalPage *>(left_bro_page->GetData());
-      internal_node->MoveAllTo(left_bro_node, parent_node->KeyAt(node_index - 1), buffer_pool_manager_);
+      internal_node->MoveAllTo(left_bro_node, left_bro_node->KeyAt(0), buffer_pool_manager_);
+      std::cout << "hello\n";
     }
     parent_node->Remove(node_index);
     buffer_pool_manager_->UnpinPage(left_bro_page->GetPageId(), true);
