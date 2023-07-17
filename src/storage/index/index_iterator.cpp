@@ -13,6 +13,7 @@ namespace bustub {
  */
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE::IndexIterator(BufferPoolManager *bpm, Page *page, int index) {
+  page_ = page;
   buffer_pool_manager_ = bpm;
   index_ = index;
   if (page != nullptr) {
@@ -23,7 +24,12 @@ INDEXITERATOR_TYPE::IndexIterator(BufferPoolManager *bpm, Page *page, int index)
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-INDEXITERATOR_TYPE::~IndexIterator() = default;  // NOLINT
+INDEXITERATOR_TYPE::~IndexIterator() {
+  if (page_ != nullptr) {
+    page_->RUnlatch();
+    buffer_pool_manager_->UnpinPage(page_->GetPageId(), false);
+  }
+}
 
 INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::IsEnd() -> bool {

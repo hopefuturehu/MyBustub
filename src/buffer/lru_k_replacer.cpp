@@ -64,7 +64,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
     }
     return;
   }
-  history_.push_front(std::pair(frame_id, 1));
+  history_.emplace_front(std::pair(frame_id, 1));
   history_map_.insert(std::pair(frame_id, history_.begin()));
   non_evictale_.insert(std::pair(frame_id, true));
   curr_size_++;

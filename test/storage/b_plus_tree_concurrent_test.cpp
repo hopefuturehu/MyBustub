@@ -101,236 +101,246 @@ void DeleteHelperSplit(BPlusTree<GenericKey<8>, RID, GenericComparator<8>> *tree
 }
 
 TEST(BPlusTreeConcurrentTest, InsertTest1) {
-  // create KeyComparator and index schema
-  auto key_schema = ParseCreateStatement("a bigint");
-  GenericComparator<8> comparator(key_schema.get());
+  for (int tmp = 0; tmp < 150; tmp++) {
+    // create KeyComparator and index schema
+    auto key_schema = ParseCreateStatement("a bigint");
+    GenericComparator<8> comparator(key_schema.get());
 
-  auto *disk_manager = new DiskManager("test.db");
-  BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
-  // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator);
-  // create and fetch header_page
-  page_id_t page_id;
-  auto header_page = bpm->NewPage(&page_id);
-  (void)header_page;
-  // keys to Insert
-  std::vector<int64_t> keys;
-  int64_t scale_factor = 100;
-  for (int64_t key = 1; key < scale_factor; key++) {
-    keys.push_back(key);
+    auto *disk_manager = new DiskManager("test.db");
+    BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
+    // create b+ tree
+    BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator);
+    // create and fetch header_page
+    page_id_t page_id;
+    auto header_page = bpm->NewPage(&page_id);
+    (void)header_page;
+    // keys to Insert
+    std::vector<int64_t> keys;
+    int64_t scale_factor = 100;
+    for (int64_t key = 1; key < scale_factor; key++) {
+      keys.push_back(key);
+    }
+    LaunchParallelTest(2, InsertHelper, &tree, keys);
+
+    std::vector<RID> rids;
+    GenericKey<8> index_key;
+    for (auto key : keys) {
+      rids.clear();
+      index_key.SetFromInteger(key);
+      tree.GetValue(index_key, &rids);
+      EXPECT_EQ(rids.size(), 1);
+
+      int64_t value = key & 0xFFFFFFFF;
+      EXPECT_EQ(rids[0].GetSlotNum(), value);
+    }
+
+    int64_t start_key = 1;
+    int64_t current_key = start_key;
+    index_key.SetFromInteger(start_key);
+    for (auto iterator = tree.Begin(index_key); iterator != tree.End(); ++iterator) {
+      auto location = (*iterator).second;
+      EXPECT_EQ(location.GetPageId(), 0);
+      EXPECT_EQ(location.GetSlotNum(), current_key);
+      current_key = current_key + 1;
+    }
+
+    EXPECT_EQ(current_key, keys.size() + 1);
+
+    bpm->UnpinPage(HEADER_PAGE_ID, true);
+    delete disk_manager;
+    delete bpm;
+    remove("test.db");
+    remove("test.log");
   }
-  LaunchParallelTest(2, InsertHelper, &tree, keys);
-
-  std::vector<RID> rids;
-  GenericKey<8> index_key;
-  for (auto key : keys) {
-    rids.clear();
-    index_key.SetFromInteger(key);
-    tree.GetValue(index_key, &rids);
-    EXPECT_EQ(rids.size(), 1);
-
-    int64_t value = key & 0xFFFFFFFF;
-    EXPECT_EQ(rids[0].GetSlotNum(), value);
-  }
-
-  int64_t start_key = 1;
-  int64_t current_key = start_key;
-  index_key.SetFromInteger(start_key);
-  for (auto iterator = tree.Begin(index_key); iterator != tree.End(); ++iterator) {
-    auto location = (*iterator).second;
-    EXPECT_EQ(location.GetPageId(), 0);
-    EXPECT_EQ(location.GetSlotNum(), current_key);
-    current_key = current_key + 1;
-  }
-
-  EXPECT_EQ(current_key, keys.size() + 1);
-
-  bpm->UnpinPage(HEADER_PAGE_ID, true);
-  delete disk_manager;
-  delete bpm;
-  remove("test.db");
-  remove("test.log");
 }
 
 TEST(BPlusTreeConcurrentTest, InsertTest2) {
   // create KeyComparator and index schema
-  auto key_schema = ParseCreateStatement("a bigint");
-  GenericComparator<8> comparator(key_schema.get());
-  auto *disk_manager = new DiskManager("test.db");
-  BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
-  // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator);
-  // create and fetch header_page
-  page_id_t page_id;
-  auto header_page = bpm->NewPage(&page_id);
-  (void)header_page;
-  // keys to Insert
-  std::vector<int64_t> keys;
-  int64_t scale_factor = 100;
-  for (int64_t key = 1; key < scale_factor; key++) {
-    keys.push_back(key);
+  for (int tmp = 0; tmp < 150; tmp++) {
+    auto key_schema = ParseCreateStatement("a bigint");
+    GenericComparator<8> comparator(key_schema.get());
+    auto *disk_manager = new DiskManager("test.db");
+    BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
+    // create b+ tree
+    BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator);
+    // create and fetch header_page
+    page_id_t page_id;
+    auto header_page = bpm->NewPage(&page_id);
+    (void)header_page;
+    // keys to Insert
+    std::vector<int64_t> keys;
+    int64_t scale_factor = 100;
+    for (int64_t key = 1; key < scale_factor; key++) {
+      keys.push_back(key);
+    }
+    LaunchParallelTest(2, InsertHelperSplit, &tree, keys, 2);
+
+    std::vector<RID> rids;
+    GenericKey<8> index_key;
+    for (auto key : keys) {
+      rids.clear();
+      index_key.SetFromInteger(key);
+      tree.GetValue(index_key, &rids);
+      EXPECT_EQ(rids.size(), 1);
+
+      int64_t value = key & 0xFFFFFFFF;
+      EXPECT_EQ(rids[0].GetSlotNum(), value);
+    }
+
+    int64_t start_key = 1;
+    int64_t current_key = start_key;
+    index_key.SetFromInteger(start_key);
+    for (auto iterator = tree.Begin(index_key); iterator != tree.End(); ++iterator) {
+      auto location = (*iterator).second;
+      EXPECT_EQ(location.GetPageId(), 0);
+      EXPECT_EQ(location.GetSlotNum(), current_key);
+      current_key = current_key + 1;
+    }
+
+    EXPECT_EQ(current_key, keys.size() + 1);
+
+    bpm->UnpinPage(HEADER_PAGE_ID, true);
+    delete disk_manager;
+    delete bpm;
+    remove("test.db");
+    remove("test.log");
   }
-  LaunchParallelTest(2, InsertHelperSplit, &tree, keys, 2);
-
-  std::vector<RID> rids;
-  GenericKey<8> index_key;
-  for (auto key : keys) {
-    rids.clear();
-    index_key.SetFromInteger(key);
-    tree.GetValue(index_key, &rids);
-    EXPECT_EQ(rids.size(), 1);
-
-    int64_t value = key & 0xFFFFFFFF;
-    EXPECT_EQ(rids[0].GetSlotNum(), value);
-  }
-
-  int64_t start_key = 1;
-  int64_t current_key = start_key;
-  index_key.SetFromInteger(start_key);
-  for (auto iterator = tree.Begin(index_key); iterator != tree.End(); ++iterator) {
-    auto location = (*iterator).second;
-    EXPECT_EQ(location.GetPageId(), 0);
-    EXPECT_EQ(location.GetSlotNum(), current_key);
-    current_key = current_key + 1;
-  }
-
-  EXPECT_EQ(current_key, keys.size() + 1);
-
-  bpm->UnpinPage(HEADER_PAGE_ID, true);
-  delete disk_manager;
-  delete bpm;
-  remove("test.db");
-  remove("test.log");
 }
 
 TEST(BPlusTreeConcurrentTest, DeleteTest1) {
   // create KeyComparator and index schema
-  auto key_schema = ParseCreateStatement("a bigint");
-  GenericComparator<8> comparator(key_schema.get());
+  for (int tmp = 0; tmp < 150; tmp++) {
+    auto key_schema = ParseCreateStatement("a bigint");
+    GenericComparator<8> comparator(key_schema.get());
 
-  auto *disk_manager = new DiskManager("test.db");
-  BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
-  // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator);
-  GenericKey<8> index_key;
-  // create and fetch header_page
-  page_id_t page_id;
-  auto header_page = bpm->NewPage(&page_id);
-  (void)header_page;
-  // sequential insert
-  std::vector<int64_t> keys = {1, 2, 3, 4, 5};
-  InsertHelper(&tree, keys);
+    auto *disk_manager = new DiskManager("test.db");
+    BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
+    // create b+ tree
+    BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator);
+    GenericKey<8> index_key;
+    // create and fetch header_page
+    page_id_t page_id;
+    auto header_page = bpm->NewPage(&page_id);
+    (void)header_page;
+    // sequential insert
+    std::vector<int64_t> keys = {1, 2, 3, 4, 5};
+    InsertHelper(&tree, keys);
 
-  std::vector<int64_t> remove_keys = {1, 5, 3, 4};
-  LaunchParallelTest(2, DeleteHelper, &tree, remove_keys);
+    std::vector<int64_t> remove_keys = {1, 5, 3, 4};
+    LaunchParallelTest(2, DeleteHelper, &tree, remove_keys);
 
-  int64_t start_key = 2;
-  int64_t current_key = start_key;
-  int64_t size = 0;
-  index_key.SetFromInteger(start_key);
-  for (auto iterator = tree.Begin(index_key); iterator != tree.End(); ++iterator) {
-    auto location = (*iterator).second;
-    EXPECT_EQ(location.GetPageId(), 0);
-    EXPECT_EQ(location.GetSlotNum(), current_key);
-    current_key = current_key + 1;
-    size = size + 1;
+    int64_t start_key = 2;
+    int64_t current_key = start_key;
+    int64_t size = 0;
+    index_key.SetFromInteger(start_key);
+    for (auto iterator = tree.Begin(index_key); iterator != tree.End(); ++iterator) {
+      auto location = (*iterator).second;
+      EXPECT_EQ(location.GetPageId(), 0);
+      EXPECT_EQ(location.GetSlotNum(), current_key);
+      current_key = current_key + 1;
+      size = size + 1;
+    }
+
+    EXPECT_EQ(size, 1);
+
+    bpm->UnpinPage(HEADER_PAGE_ID, true);
+    delete disk_manager;
+    delete bpm;
+    remove("test.db");
+    remove("test.log");
   }
-
-  EXPECT_EQ(size, 1);
-
-  bpm->UnpinPage(HEADER_PAGE_ID, true);
-  delete disk_manager;
-  delete bpm;
-  remove("test.db");
-  remove("test.log");
 }
 
 TEST(BPlusTreeConcurrentTest, DeleteTest2) {
   // create KeyComparator and index schema
-  auto key_schema = ParseCreateStatement("a bigint");
-  GenericComparator<8> comparator(key_schema.get());
+  for (int tmp = 0; tmp < 150; tmp++) {
+    auto key_schema = ParseCreateStatement("a bigint");
+    GenericComparator<8> comparator(key_schema.get());
 
-  auto *disk_manager = new DiskManager("test.db");
-  BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
-  // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator);
-  GenericKey<8> index_key;
-  // create and fetch header_page
-  page_id_t page_id;
-  auto header_page = bpm->NewPage(&page_id);
-  (void)header_page;
+    auto *disk_manager = new DiskManager("test.db");
+    BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
+    // create b+ tree
+    BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator);
+    GenericKey<8> index_key;
+    // create and fetch header_page
+    page_id_t page_id;
+    auto header_page = bpm->NewPage(&page_id);
+    (void)header_page;
 
-  // sequential insert
-  std::vector<int64_t> keys = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  InsertHelper(&tree, keys);
+    // sequential insert
+    std::vector<int64_t> keys = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    InsertHelper(&tree, keys);
 
-  std::vector<int64_t> remove_keys = {1, 4, 3, 2, 5, 6};
-  LaunchParallelTest(2, DeleteHelperSplit, &tree, remove_keys, 2);
+    std::vector<int64_t> remove_keys = {1, 4, 3, 2, 5, 6};
+    LaunchParallelTest(2, DeleteHelperSplit, &tree, remove_keys, 2);
 
-  int64_t start_key = 7;
-  int64_t current_key = start_key;
-  int64_t size = 0;
-  index_key.SetFromInteger(start_key);
-  for (auto iterator = tree.Begin(index_key); iterator != tree.End(); ++iterator) {
-    auto location = (*iterator).second;
-    EXPECT_EQ(location.GetPageId(), 0);
-    EXPECT_EQ(location.GetSlotNum(), current_key);
-    current_key = current_key + 1;
-    size = size + 1;
+    int64_t start_key = 7;
+    int64_t current_key = start_key;
+    int64_t size = 0;
+    index_key.SetFromInteger(start_key);
+    for (auto iterator = tree.Begin(index_key); iterator != tree.End(); ++iterator) {
+      auto location = (*iterator).second;
+      EXPECT_EQ(location.GetPageId(), 0);
+      EXPECT_EQ(location.GetSlotNum(), current_key);
+      current_key = current_key + 1;
+      size = size + 1;
+    }
+
+    EXPECT_EQ(size, 4);
+
+    bpm->UnpinPage(HEADER_PAGE_ID, true);
+    delete disk_manager;
+    delete bpm;
+    remove("test.db");
+    remove("test.log");
   }
-
-  EXPECT_EQ(size, 4);
-
-  bpm->UnpinPage(HEADER_PAGE_ID, true);
-  delete disk_manager;
-  delete bpm;
-  remove("test.db");
-  remove("test.log");
 }
 
 TEST(BPlusTreeConcurrentTest, MixTest) {
   // create KeyComparator and index schema
-  auto key_schema = ParseCreateStatement("a bigint");
-  GenericComparator<8> comparator(key_schema.get());
+  for (int tmp = 0; tmp < 150; tmp++) {
+    auto key_schema = ParseCreateStatement("a bigint");
+    GenericComparator<8> comparator(key_schema.get());
 
-  auto *disk_manager = new DiskManager("test.db");
-  BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
-  // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator);
-  GenericKey<8> index_key;
+    auto *disk_manager = new DiskManager("test.db");
+    BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
+    // create b+ tree
+    BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator);
+    GenericKey<8> index_key;
 
-  // create and fetch header_page
-  page_id_t page_id;
-  auto header_page = bpm->NewPage(&page_id);
-  (void)header_page;
-  // first, populate index
-  std::vector<int64_t> keys = {1, 2, 3, 4, 5};
-  InsertHelper(&tree, keys);
+    // create and fetch header_page
+    page_id_t page_id;
+    auto header_page = bpm->NewPage(&page_id);
+    (void)header_page;
+    // first, populate index
+    std::vector<int64_t> keys = {1, 2, 3, 4, 5};
+    InsertHelper(&tree, keys);
 
-  // concurrent insert
-  keys.clear();
-  for (int i = 6; i <= 10; i++) {
-    keys.push_back(i);
+    // concurrent insert
+    keys.clear();
+    for (int i = 6; i <= 10; i++) {
+      keys.push_back(i);
+    }
+    LaunchParallelTest(1, InsertHelper, &tree, keys);
+    // concurrent delete
+    std::vector<int64_t> remove_keys = {1, 4, 3, 5, 6};
+    LaunchParallelTest(1, DeleteHelper, &tree, remove_keys);
+
+    int64_t start_key = 2;
+    int64_t size = 0;
+    index_key.SetFromInteger(start_key);
+    for (auto iterator = tree.Begin(index_key); iterator != tree.End(); ++iterator) {
+      size = size + 1;
+    }
+
+    EXPECT_EQ(size, 5);
+
+    bpm->UnpinPage(HEADER_PAGE_ID, true);
+    delete disk_manager;
+    delete bpm;
+    remove("test.db");
+    remove("test.log");
   }
-  LaunchParallelTest(1, InsertHelper, &tree, keys);
-  // concurrent delete
-  std::vector<int64_t> remove_keys = {1, 4, 3, 5, 6};
-  LaunchParallelTest(1, DeleteHelper, &tree, remove_keys);
-
-  int64_t start_key = 2;
-  int64_t size = 0;
-  index_key.SetFromInteger(start_key);
-  for (auto iterator = tree.Begin(index_key); iterator != tree.End(); ++iterator) {
-    size = size + 1;
-  }
-
-  EXPECT_EQ(size, 5);
-
-  bpm->UnpinPage(HEADER_PAGE_ID, true);
-  delete disk_manager;
-  delete bpm;
-  remove("test.db");
-  remove("test.log");
 }
 
 }  // namespace bustub
