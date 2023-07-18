@@ -78,8 +78,8 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
   std::scoped_lock<std::mutex> lock(latch_);
   frame_id_t frame_id;
   if (page_table_->Find(page_id, frame_id)) {
-    if(pages_[frame_id].pin_count_ < 0) {
-      std::cout<<page_id<<" PagePinCount error\n";
+    if (pages_[frame_id].pin_count_ < 0) {
+      std::cout << page_id << " PagePinCount error\n";
       assert(false);
     }
     if (pages_[frame_id].pin_count_ == 0) {
@@ -125,7 +125,7 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
   frame_id_t frame_id;
   if (page_table_->Find(page_id, frame_id)) {
     if (pages_[frame_id].pin_count_ > 0) {
-      std::cout<<page_id<<" deletePage error\n";
+      std::cout << page_id << " deletePage error\n";
       assert(false);
       return false;
     }

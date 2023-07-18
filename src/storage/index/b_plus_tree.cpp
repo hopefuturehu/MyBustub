@@ -141,11 +141,11 @@ auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) -
   //  尝试借值
   if (node_index > 0) {  //  左边
     auto left_bro_page = buffer_pool_manager_->FetchPage(parent_node->ValueAt(node_index - 1));
+    left_bro_page->WLatch();
     if (node->IsLeafPage()) {
       auto left_bro_node = reinterpret_cast<LeafPage *>(left_bro_page->GetData());
       auto leaf_node = reinterpret_cast<LeafPage *>(node);
       if (left_bro_node->GetSize() > left_bro_node->GetMinSize()) {
-        left_bro_page->WLatch();
         left_bro_node->MoveLastToFrontOf(leaf_node);
         parent_node->SetKeyAt(node_index, leaf_node->KeyAt(0));
         left_bro_page->WUnlatch();
@@ -157,7 +157,6 @@ auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) -
       auto internal_node = reinterpret_cast<InternalPage *>(node);
       auto left_bro_node = reinterpret_cast<InternalPage *>(left_bro_page->GetData());
       if (left_bro_node->GetSize() > left_bro_node->GetMinSize()) {
-        left_bro_page->WLatch();
         left_bro_node->MoveLastToFrontOf(internal_node, parent_node->KeyAt(node_index), buffer_pool_manager_);
         parent_node->SetKeyAt(node_index, internal_node->KeyAt(0));
         left_bro_page->WUnlatch();
@@ -166,15 +165,16 @@ auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) -
         return true;
       }
     }
+    left_bro_page->WUnlatch();
     buffer_pool_manager_->UnpinPage(left_bro_page->GetPageId(), false);
   }
   if (node_index != parent_node->GetSize() - 1) {  //  右边
     auto right_bro_page = buffer_pool_manager_->FetchPage(parent_node->ValueAt(node_index + 1));
+    right_bro_page->WLatch();
     if (node->IsLeafPage()) {
       auto leaf_node = reinterpret_cast<LeafPage *>(node);
       auto right_bro_node = reinterpret_cast<LeafPage *>(right_bro_page->GetData());
       if (right_bro_node->GetSize() > right_bro_node->GetMinSize()) {
-        right_bro_page->WLatch();
         right_bro_node->MoveFirstToEndOf(leaf_node);
         parent_node->SetKeyAt(node_index + 1, right_bro_node->KeyAt(0));
         right_bro_page->WUnlatch();
@@ -186,7 +186,6 @@ auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) -
       auto internal_node = reinterpret_cast<InternalPage *>(node);
       auto right_bro_node = reinterpret_cast<InternalPage *>(right_bro_page);
       if (right_bro_node->GetSize() > right_bro_node->GetMinSize()) {
-        right_bro_page->WLatch();
         right_bro_node->MoveFirstToEndOf(internal_node, parent_node->KeyAt(node_index + 1), buffer_pool_manager_);
         parent_node->SetKeyAt(node_index + 1, right_bro_node->KeyAt(0));
         right_bro_page->WUnlatch();
@@ -195,6 +194,7 @@ auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) -
         return true;
       }
     }
+    right_bro_page->WUnlatch();
     buffer_pool_manager_->UnpinPage(right_bro_page->GetPageId(), false);
   }
   // 再尝试合并，统一向左合并
@@ -215,6 +215,9 @@ auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) -
     left_bro_page->WUnlatch();
     buffer_pool_manager_->UnpinPage(left_bro_page->GetPageId(), true);
     buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);
+    if (parent_node->GetSize() >= parent_node->GetMinSize()) {
+      return true;
+    }
     return CoalesceOrRedistribute(parent_node, transaction);
   }
   if (node_index != parent_node->GetSize() - 1) {  //  右边
@@ -234,6 +237,9 @@ auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) -
     parent_node->Remove(node_index + 1);
     buffer_pool_manager_->UnpinPage(right_bro_page->GetPageId(), true);
     buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);
+    if (parent_node->GetSize() >= parent_node->GetMinSize()) {
+      return true;
+    }
     return CoalesceOrRedistribute(parent_node, transaction);
   }
   return false;
