@@ -67,7 +67,7 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
     replacer_->RecordAccess(frame_id);
     replacer_->SetEvictable(frame_id, false);
     pages_[frame_id].page_id_ = page_id;
-    disk_manager_->ReadPage(page_id, pages_[frame_id].GetData());
+    disk_manager_->ReadPage(pages_[frame_id].page_id_, pages_[frame_id].data_);
     pages_[frame_id].pin_count_ = 1;
     return &pages_[frame_id];
   }
