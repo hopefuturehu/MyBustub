@@ -1060,12 +1060,17 @@ TEST(BPlusTreeConcurrentTestC2Seq, ScaleTest) {
 
   int64_t start_key = 1;
   int64_t current_key = start_key;
-  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
+  int64_t count = 0;
+  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator, count++) {
+    if (count == 9998) {
+      count += 1;
+    }
     (void)*iterator;
     auto location = (*iterator).second;
     EXPECT_EQ(location.GetPageId(), 0);
     EXPECT_EQ(location.GetSlotNum(), current_key);
     current_key = current_key + 1;
+    // std::cout<<count<<std::endl;
   }
   EXPECT_EQ(current_key, keys.size() + 1);
 

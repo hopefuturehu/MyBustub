@@ -256,13 +256,28 @@ auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) -
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
+  root_latch_.RLock();
   if (root_page_id_ == INVALID_PAGE_ID) {
     return INDEXITERATOR_TYPE(nullptr, nullptr);
   }
-  root_latch_.RLock();
-  auto left_leaf = GetLeafPage(KeyType(), Operation::Read, nullptr);
+  page_id_t left_page_id = root_page_id_;
+  Page *left_page = buffer_pool_manager_->FetchPage(left_page_id);
+  left_page->RLatch();
+  while (true) {
+    auto node = reinterpret_cast<BPlusTreePage *>(left_page);
+    if (node->IsLeafPage()) {
+      break;
+    }
+    auto i_node = reinterpret_cast<InternalPage *>(left_page);
+    left_page_id = i_node->ValueAt(0);
+    left_page->RUnlatch();
+    buffer_pool_manager_->UnpinPage(left_page->GetPageId(), false);
+    left_page = buffer_pool_manager_->FetchPage(left_page_id);
+    left_page->RLatch();
+  }
+  // assert(left_page_id > 0);
   root_latch_.RUnlock();
-  return INDEXITERATOR_TYPE(buffer_pool_manager_, left_leaf, 0);
+  return INDEXITERATOR_TYPE(buffer_pool_manager_, left_page, 0);
 }
 
 /*
@@ -320,6 +335,7 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
     buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
   }
   auto node = reinterpret_cast<LeafPage *>(page);
+  // assert(leaf_id > 0);
   return INDEXITERATOR_TYPE(buffer_pool_manager_, page, node->GetSize());
 }
 
