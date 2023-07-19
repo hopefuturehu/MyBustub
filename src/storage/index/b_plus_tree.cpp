@@ -32,10 +32,12 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return root_page_id_ == INVALID_P
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction) -> bool {
+  root_latch_.RLock();
   auto leaf_page = GetLeafPage(key, Operation::Read, transaction);
   auto leaf_node = reinterpret_cast<LeafPage *>(leaf_page->GetData());
   ValueType v;
   bool nil = leaf_node->LookUp(key, v, comparator_);
+  root_latch_.RUnlock();
   leaf_page->RUnlatch();
   buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
   if (nil) {
@@ -257,7 +259,9 @@ auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
   if (root_page_id_ == INVALID_PAGE_ID) {
     return INDEXITERATOR_TYPE(nullptr, nullptr);
   }
+  root_latch_.RLock();
   auto left_leaf = GetLeafPage(KeyType(), Operation::Read, nullptr);
+  root_latch_.RUnlock();
   return INDEXITERATOR_TYPE(buffer_pool_manager_, left_leaf, 0);
 }
 
@@ -268,9 +272,14 @@ auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
+  if (root_page_id_ == INVALID_PAGE_ID) {
+    return INDEXITERATOR_TYPE(nullptr, nullptr);
+  }
+  root_latch_.RLock();
   auto leaf_page = GetLeafPage(key, Operation::Read, nullptr);
   auto leaf_node = reinterpret_cast<LeafPage *>(leaf_page->GetData());
-  leaf_page->RUnlatch();
+  // leaf_page->RUnlatch();
+  root_latch_.RUnlock();
   return INDEXITERATOR_TYPE(buffer_pool_manager_, leaf_page, leaf_node->KeyInd(key, comparator_));
 }
 
@@ -318,7 +327,11 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
  * @return Page id of the root of this tree
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t { return root_page_id_; }
+auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t {
+  root_latch_.RLock();
+  root_latch_.RUnlock();
+  return root_page_id_;
+}
 
 /*****************************************************************************
  * CUSTOM
@@ -442,7 +455,6 @@ auto BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value, 
     ReleaseWlatches(transaction);
   }
   leaf_page->WUnlatch();
-  // buffer_pool_manager_->UnpinPage(page->GetPageId(), true);
   buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
   return true;
 }
@@ -500,7 +512,7 @@ void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {
   root_page->Init(root_page_id_, INVALID_PAGE_ID, leaf_max_size_);
   root_page->Insert(key, value, comparator_);
   buffer_pool_manager_->UnpinPage(root_page_id_, true);
-  // UpdateRootPageId(1);
+  UpdateRootPageId(1);
 }
 
 INDEX_TEMPLATE_ARGUMENTS  //  call before delete
