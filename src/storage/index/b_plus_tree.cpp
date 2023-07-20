@@ -308,17 +308,7 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
   if (root_page_id_ == INVALID_PAGE_ID) {
     return INDEXITERATOR_TYPE(nullptr, nullptr);
   }
-  // auto root_page = buffer_pool_manager_->FetchPage(root_page_id_);
-  // root_latch_.RLock();
-  // auto root_node = reinterpret_cast<InternalPage *>(root_page->GetData());
-  // auto key = root_node->KeyAt(root_node->GetSize() - 1);
-  // root_latch_.RUnlock();
-  // buffer_pool_manager_->UnpinPage(root_page->GetPageId(), false);
-  // auto right_page = GetLeafPage(key, Operation::Read, nullptr);
-  // auto right_node = reinterpret_cast<LeafPage *>(right_page->GetData());
-  // // right_page->RUnlatch();
-  // // buffer_pool_manager_->UnpinPage(page_id_t page_id, bool is_dirty)
-
+  root_latch_.RLock();
   page_id_t leaf_id = root_page_id_;
   Page *page = nullptr;
   while (true) {
@@ -335,7 +325,8 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
     buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
   }
   auto node = reinterpret_cast<LeafPage *>(page);
-  // assert(leaf_id > 0);
+  assert(leaf_id > 0);
+  root_latch_.RUnlock();
   return INDEXITERATOR_TYPE(buffer_pool_manager_, page, node->GetSize());
 }
 
