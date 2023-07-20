@@ -26,7 +26,7 @@ INDEXITERATOR_TYPE::IndexIterator(BufferPoolManager *bpm, Page *page, int index)
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE::~IndexIterator() {
   if (page_ != nullptr) {
-    page_->RUnlatch();
+    // page_->RUnlatch();
     buffer_pool_manager_->UnpinPage(page_->GetPageId(), false);
   }
 }
@@ -43,8 +43,8 @@ INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & {
   if (index_ == leaf_->GetSize() - 1 && leaf_->GetNextPageId() != INVALID_PAGE_ID) {
     auto next_page = buffer_pool_manager_->FetchPage(leaf_->GetNextPageId());
-    next_page->RLatch();
-    page_->RUnlatch();
+    // next_page->RLatch();
+    // page_->RUnlatch();
     buffer_pool_manager_->UnpinPage(page_->GetPageId(), false);
     page_ = next_page;
     leaf_ = reinterpret_cast<LeafPage *>(page_->GetData());

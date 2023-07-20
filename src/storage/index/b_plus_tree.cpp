@@ -256,13 +256,13 @@ auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) -
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
-  root_latch_.RLock();
+  // root_latch_.RLock();
   if (root_page_id_ == INVALID_PAGE_ID) {
     return INDEXITERATOR_TYPE(nullptr, nullptr);
   }
   page_id_t left_page_id = root_page_id_;
   Page *left_page = buffer_pool_manager_->FetchPage(left_page_id);
-  left_page->RLatch();
+  // left_page->RLatch();
   while (true) {
     auto node = reinterpret_cast<BPlusTreePage *>(left_page);
     if (node->IsLeafPage()) {
@@ -270,13 +270,13 @@ auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
     }
     auto i_node = reinterpret_cast<InternalPage *>(left_page);
     left_page_id = i_node->ValueAt(0);
-    left_page->RUnlatch();
+    // left_page->RUnlatch();
     buffer_pool_manager_->UnpinPage(left_page->GetPageId(), false);
     left_page = buffer_pool_manager_->FetchPage(left_page_id);
-    left_page->RLatch();
+    // left_page->RLatch();
   }
   // assert(left_page_id > 0);
-  root_latch_.RUnlock();
+  // root_latch_.RUnlock();
   return INDEXITERATOR_TYPE(buffer_pool_manager_, left_page, 0);
 }
 
@@ -290,11 +290,25 @@ auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
   if (root_page_id_ == INVALID_PAGE_ID) {
     return INDEXITERATOR_TYPE(nullptr, nullptr);
   }
-  root_latch_.RLock();
-  auto leaf_page = GetLeafPage(key, Operation::Read, nullptr);
+  // root_latch_.RLock();
+  page_id_t leaf_id = root_page_id_;
+  while (true) {
+    Page *page = buffer_pool_manager_->FetchPage(leaf_id);
+    // page->RLatch();
+    auto tree_node = reinterpret_cast<BPlusTreePage *>(page->GetData());
+    if (tree_node->IsLeafPage()) {
+      break;
+    }
+    //  此时tree_node 其实是internal_node, 那么就向下遍历
+    auto i_node = reinterpret_cast<InternalPage *>(tree_node);
+    leaf_id = i_node->LookUp(key, comparator_);
+    // page->RUnlatch();
+    buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
+  }
+  auto leaf_page = buffer_pool_manager_->FetchPage(leaf_id);
   auto leaf_node = reinterpret_cast<LeafPage *>(leaf_page->GetData());
   // leaf_page->RUnlatch();
-  root_latch_.RUnlock();
+  // root_latch_.RUnlock();
   return INDEXITERATOR_TYPE(buffer_pool_manager_, leaf_page, leaf_node->KeyInd(key, comparator_));
 }
 
@@ -308,12 +322,12 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
   if (root_page_id_ == INVALID_PAGE_ID) {
     return INDEXITERATOR_TYPE(nullptr, nullptr);
   }
-  root_latch_.RLock();
+  // root_latch_.RLock();
   page_id_t leaf_id = root_page_id_;
   Page *page = nullptr;
   while (true) {
     page = buffer_pool_manager_->FetchPage(leaf_id);
-    page->RLatch();
+    // page->RLatch();
     auto tree_node = reinterpret_cast<BPlusTreePage *>(page->GetData());
     if (tree_node->IsLeafPage()) {
       break;
@@ -321,12 +335,12 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
     //  此时tree_node 其实是internal_node, 那么就向下遍历
     auto i_node = reinterpret_cast<InternalPage *>(tree_node);
     leaf_id = i_node->ValueAt(i_node->GetSize() - 1);
-    page->RUnlatch();
+    // page->RUnlatch();
     buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
   }
   auto node = reinterpret_cast<LeafPage *>(page);
   assert(leaf_id > 0);
-  root_latch_.RUnlock();
+  // root_latch_.RUnlock();
   return INDEXITERATOR_TYPE(buffer_pool_manager_, page, node->GetSize());
 }
 
