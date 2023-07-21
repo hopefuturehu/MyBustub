@@ -25,7 +25,7 @@ class IndexIterator {
   using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
 
   // you may define your own constructor based on your member variables
-  IndexIterator(BufferPoolManager *bpm, Page *page, int index = 0);
+  IndexIterator(BufferPoolManager *bpm, page_id_t page_id, int index = 0);
   ~IndexIterator();  // NOLINT
 
   auto IsEnd() -> bool;
@@ -41,7 +41,7 @@ class IndexIterator {
  private:
   // add your own private member variables here
   BufferPoolManager *buffer_pool_manager_;
-  Page *page_{nullptr};
+  page_id_t page_id_{INVALID_PAGE_ID};
   LeafPage *leaf_ = nullptr;
   int index_ = 0;
 };
