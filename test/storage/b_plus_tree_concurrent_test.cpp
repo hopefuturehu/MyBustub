@@ -39,7 +39,7 @@
 namespace bustub {
 // helper function to launch multiple threads
 template <typename... Args>
-void LaunchParallelTest(uint64_t num_threads, uint64_t txn_id_start, Args &&...args) {
+void LaunchParallelTest(uint64_t num_threads, uint64_t txn_id_start, Args &&... args) {
   std::vector<std::thread> thread_group;
 
   // Launch a group of threads
@@ -419,7 +419,7 @@ void MixTest2Call() {
     std::vector<int64_t> perserved_keys;
     std::vector<int64_t> dynamic_keys;
     size_t total_keys = 1000;
-    size_t sieve = 5;
+    size_t sieve = 2;
     for (size_t i = 1; i <= total_keys; i++) {
       if (i % sieve == 0) {
         perserved_keys.push_back(i);
@@ -1060,17 +1060,12 @@ TEST(BPlusTreeConcurrentTestC2Seq, ScaleTest) {
 
   int64_t start_key = 1;
   int64_t current_key = start_key;
-  int64_t count = 0;
-  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator, count++) {
-    if (count == 9998) {
-      count += 1;
-    }
+  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
     (void)*iterator;
     auto location = (*iterator).second;
     EXPECT_EQ(location.GetPageId(), 0);
     EXPECT_EQ(location.GetSlotNum(), current_key);
     current_key = current_key + 1;
-    // std::cout<<count<<std::endl;
   }
   EXPECT_EQ(current_key, keys.size() + 1);
 

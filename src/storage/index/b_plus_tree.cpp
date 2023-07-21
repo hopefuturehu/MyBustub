@@ -264,11 +264,11 @@ auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
   Page *left_page = buffer_pool_manager_->FetchPage(left_page_id);
   // left_page->RLatch();
   while (true) {
-    auto node = reinterpret_cast<BPlusTreePage *>(left_page);
+    auto node = reinterpret_cast<BPlusTreePage *>(left_page->GetData());
     if (node->IsLeafPage()) {
       break;
     }
-    auto i_node = reinterpret_cast<InternalPage *>(left_page);
+    auto i_node = reinterpret_cast<InternalPage *>(left_page->GetData());
     left_page_id = i_node->ValueAt(0);
     // left_page->RUnlatch();
     buffer_pool_manager_->UnpinPage(left_page->GetPageId(), false);
@@ -307,9 +307,18 @@ auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
   }
   auto leaf_page = buffer_pool_manager_->FetchPage(leaf_id);
   auto leaf_node = reinterpret_cast<LeafPage *>(leaf_page->GetData());
+  auto idx = leaf_node->KeyInd(key, comparator_);
+  if (idx == leaf_node->GetSize()) {
+    if (leaf_node->GetNextPageId() == INVALID_PAGE_ID) {
+      return End();
+    }
+    leaf_page = buffer_pool_manager_->FetchPage(leaf_node->GetNextPageId());
+    buffer_pool_manager_->UnpinPage(leaf_id, false);
+    return INDEXITERATOR_TYPE(buffer_pool_manager_, leaf_page, 0);
+  }
   // leaf_page->RUnlatch();
   // root_latch_.RUnlock();
-  return INDEXITERATOR_TYPE(buffer_pool_manager_, leaf_page, leaf_node->KeyInd(key, comparator_));
+  return INDEXITERATOR_TYPE(buffer_pool_manager_, leaf_page, idx);
 }
 
 /*
@@ -338,7 +347,7 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
     // page->RUnlatch();
     buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
   }
-  auto node = reinterpret_cast<LeafPage *>(page);
+  auto node = reinterpret_cast<LeafPage *>(page->GetData());
   assert(leaf_id > 0);
   // root_latch_.RUnlock();
   return INDEXITERATOR_TYPE(buffer_pool_manager_, page, node->GetSize());
@@ -500,7 +509,7 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node, const KeyType &ke
   }
   // 非根结点上插入走递归方式，不满插入就结束；满了就插入->分裂->InsertIntoParent
   auto parent_page = buffer_pool_manager_->FetchPage(old_node->GetParentPageId());
-  auto *parent_node = reinterpret_cast<InternalPage *>(parent_page);
+  auto *parent_node = reinterpret_cast<InternalPage *>(parent_page->GetData());
   if (parent_node->GetSize() < internal_max_size_) {  //  父节点未满，插就完事了
     parent_node->InsertNodeAt(old_node->GetPageId(), key, new_node->GetPageId());
     ReleaseWlatches(trans);

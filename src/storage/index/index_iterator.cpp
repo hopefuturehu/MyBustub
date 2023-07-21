@@ -37,11 +37,17 @@ auto INDEXITERATOR_TYPE::IsEnd() -> bool {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto INDEXITERATOR_TYPE::operator*() -> const MappingType & { return leaf_->GetItem(index_); }
+auto INDEXITERATOR_TYPE::operator*() -> const MappingType & {
+  BUSTUB_ASSERT(page_->GetPageId() != INVALID_PAGE_ID, "page_id_ != INVALID_PAGE_ID");
+  BUSTUB_ASSERT(page_->GetPageId() == leaf_->GetPageId(), "page_id_ == leaf_page_->GetPageId()");  // should match
+  // BUSTUB_ASSERT(leaf_->GetSize() > index_, "leaf_page_->GetSize() > idx_");
+  return leaf_->GetItem(index_);
+}
 
 INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & {
-  if (index_ == leaf_->GetSize() - 1 && leaf_->GetNextPageId() != INVALID_PAGE_ID) {
+  if (leaf_->GetNextPageId() != INVALID_PAGE_ID && index_ == leaf_->GetSize() - 1) {
+    assert(leaf_->GetNextPageId() != INVALID_PAGE_ID);
     auto next_page = buffer_pool_manager_->FetchPage(leaf_->GetNextPageId());
     // next_page->RLatch();
     // page_->RUnlatch();
