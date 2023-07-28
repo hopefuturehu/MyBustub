@@ -52,6 +52,7 @@ auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & {
     buffer_pool_manager_->UnpinPage(page_id_, false);
     page_id_ = next_page->GetPageId();
     leaf_ = reinterpret_cast<LeafPage *>(next_page->GetData());
+    BUSTUB_ASSERT(page_id_ == leaf_->GetPageId(), "PAGE ID != LEAF->GETPAGEID");
     index_ = 0;
   } else if (leaf_->GetNextPageId() == INVALID_PAGE_ID && index_ == leaf_->GetSize() - 1) {
     buffer_pool_manager_->UnpinPage(page_id_, false);

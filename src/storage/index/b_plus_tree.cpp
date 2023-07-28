@@ -494,6 +494,7 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node, const KeyType &ke
                                       Transaction *trans) {
   if (old_node->IsRootPage()) {  //  根结点满了，那就搞一个新的根结点
     auto page = buffer_pool_manager_->NewPage(&root_page_id_);
+    page->WLatch();
     if (page == nullptr) {
       throw Exception(ExceptionType::OUT_OF_MEMORY, "Cannot allocate new page");
     }
@@ -502,6 +503,7 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node, const KeyType &ke
     new_root->PopulateNewRoot(old_node->GetPageId(), key, new_node->GetPageId());
     old_node->SetParentPageId(new_root->GetPageId());
     new_node->SetParentPageId(new_root->GetPageId());
+    page->WUnlatch();
     buffer_pool_manager_->UnpinPage(page->GetPageId(), true);
     UpdateRootPageId(0);
     ReleaseWlatches(trans);

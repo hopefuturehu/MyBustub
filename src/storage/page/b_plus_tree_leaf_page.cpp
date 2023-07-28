@@ -63,7 +63,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) -> const MappingType & { ret
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::LookUp(const KeyType &K, ValueType &V, const KeyComparator &comparator) const -> bool {
   int l = 0;
-  int r = GetSize();
+  int r = GetSize() - 1;
   if (l >= r) {
     if (comparator(array_[r].first, K) == 0) {
       V = array_[r].second;

@@ -43,11 +43,12 @@ auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
   if (GetAvailableFrame(&frame_id)) {
     *page_id = AllocatePage();
     page_table_->Insert(*page_id, frame_id);
+    pages_[frame_id].ResetMemory();
+    pages_[frame_id].is_dirty_ = false;
     pages_[frame_id].page_id_ = *page_id;
     pages_[frame_id].pin_count_ = 1;
     replacer_->RecordAccess(frame_id);
     replacer_->SetEvictable(frame_id, false);
-
     return &pages_[frame_id];
   }
   return nullptr;
@@ -63,11 +64,12 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
     return &pages_[frame_id];
   }
   if (GetAvailableFrame(&frame_id)) {
+    pages_[frame_id].ResetMemory();
     page_table_->Insert(page_id, frame_id);
     replacer_->RecordAccess(frame_id);
     replacer_->SetEvictable(frame_id, false);
     pages_[frame_id].page_id_ = page_id;
-    disk_manager_->ReadPage(pages_[frame_id].page_id_, pages_[frame_id].data_);
+    disk_manager_->ReadPage(pages_[frame_id].page_id_, pages_[frame_id].GetData());
     pages_[frame_id].pin_count_ = 1;
     return &pages_[frame_id];
   }
@@ -80,10 +82,10 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
   if (page_table_->Find(page_id, frame_id)) {
     if (pages_[frame_id].pin_count_ < 0) {
       std::cout << page_id << " PagePinCount error\n";
-      // assert(false);
+      assert(false);
     }
     if (pages_[frame_id].pin_count_ == 0) {
-      pages_[frame_id].is_dirty_ |= is_dirty;
+      // pages_[frame_id].is_dirty_ |= is_dirty;
       return false;
     }
     pages_[frame_id].pin_count_--;
@@ -100,7 +102,7 @@ auto BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) -> bool {
   std::scoped_lock<std::mutex> lock(latch_);
   frame_id_t frame_id;
   if (page_table_->Find(page_id, frame_id)) {
-    disk_manager_->WritePage(pages_[frame_id].page_id_, pages_[frame_id].data_);
+    disk_manager_->WritePage(pages_[frame_id].page_id_, pages_[frame_id].GetData());
     pages_[frame_id].is_dirty_ = false;
     return true;
   }
@@ -129,10 +131,15 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
       // assert(false);
       return false;
     }
-    DeallocatePage(page_id);
+    if(pages_[frame_id].IsDirty()){
+      disk_manager_->WritePage(page_id, pages_[frame_id].GetData());
+    }
     pages_[frame_id].is_dirty_ = false;
+    pages_[frame_id].pin_count_ = 0;
+    pages_[frame_id].page_id_ = INVALID_PAGE_ID;
     pages_[frame_id].ResetMemory();
     page_table_->Remove(page_id);
+    replacer_->Remove(frame_id);
     free_list_.emplace_back(frame_id);
   }
   return true;

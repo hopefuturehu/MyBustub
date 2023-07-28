@@ -68,7 +68,7 @@ class BufferPoolManager {
     GradingCallback(callback, CallbackType::BEFORE, INVALID_PAGE_ID);
     auto *result = NewPgImp(page_id);
     GradingCallback(callback, CallbackType::AFTER, *page_id);
-    // std::cout<<*page_id<<" Fetched\n";
+    // std::cout<<*page_id<<" created by"<<std::this_thread::get_id()<<std::endl;
     return result;
   }
 

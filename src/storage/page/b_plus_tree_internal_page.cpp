@@ -69,6 +69,7 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::LookUp(KeyType K, const KeyComparator &comp
       r = mid;
     }
   }
+  assert(r != 0);
   return array_[r - 1].second;
 }
 
