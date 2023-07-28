@@ -78,6 +78,7 @@ void DiskManager::ShutDown() {
  * Write the contents of the specified page into disk file
  */
 void DiskManager::WritePage(page_id_t page_id, const char *page_data) {
+  // std::cout<<std::this_thread::get_id()<<" "<<page_id<<" Write to disk"<<std::endl;
   std::scoped_lock scoped_db_io_latch(db_io_latch_);
   size_t offset = static_cast<size_t>(page_id) * BUSTUB_PAGE_SIZE;
   // set write cursor to offset
@@ -97,6 +98,7 @@ void DiskManager::WritePage(page_id_t page_id, const char *page_data) {
  * Read the contents of the specified page into the given memory area
  */
 void DiskManager::ReadPage(page_id_t page_id, char *page_data) {
+  // std::cout<<std::this_thread::get_id()<<" "<<page_id<<" Read from disk"<<std::endl;
   std::scoped_lock scoped_db_io_latch(db_io_latch_);
   int offset = page_id * BUSTUB_PAGE_SIZE;
   // check if read beyond file length
@@ -115,7 +117,7 @@ void DiskManager::ReadPage(page_id_t page_id, char *page_data) {
     int read_count = db_io_.gcount();
     if (read_count < BUSTUB_PAGE_SIZE) {
       LOG_DEBUG("Read less than a page");
-      std::cout<<std::this_thread::get_id()<<std::endl;
+      std::cout << std::this_thread::get_id() << std::endl;
       assert(read_count > BUSTUB_PAGE_SIZE);
       db_io_.clear();
       // std::cerr << "Read less than a page" << std::endl;

@@ -39,7 +39,6 @@ class BufferPoolManager {
 
   /** Grading function. Do not modify! */
   auto FetchPage(page_id_t page_id, bufferpool_callback_fn callback = nullptr) -> Page * {
-    // std::cout<<page_id<<" Fetched\n";
     GradingCallback(callback, CallbackType::BEFORE, page_id);
     auto *result = FetchPgImp(page_id);
     GradingCallback(callback, CallbackType::AFTER, page_id);
@@ -48,7 +47,6 @@ class BufferPoolManager {
 
   /** Grading function. Do not modify! */
   auto UnpinPage(page_id_t page_id, bool is_dirty, bufferpool_callback_fn callback = nullptr) -> bool {
-    // std::cout<<page_id<<" Unpined\n";
     GradingCallback(callback, CallbackType::BEFORE, page_id);
     auto result = UnpinPgImp(page_id, is_dirty);
     GradingCallback(callback, CallbackType::AFTER, page_id);

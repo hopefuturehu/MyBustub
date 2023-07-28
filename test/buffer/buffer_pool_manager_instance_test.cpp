@@ -158,7 +158,7 @@ TEST(BufferPoolManagerInstanceTest, NewPage) {  // NOLINT
   bpm->UnpinPage(0, false);
   bpm->NewPage(&temp_page_id);
   Page *page = bpm->FetchPage(0);
-  std::cout<<page->GetPageId()<<std::endl;
+  std::cout << page->GetPageId() << std::endl;
 
   // all the pages are pinned, the buffer pool is full
   for (int i = 0; i < 100; ++i) {
