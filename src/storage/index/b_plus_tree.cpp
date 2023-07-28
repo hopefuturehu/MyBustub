@@ -275,6 +275,7 @@ auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
     left_page = buffer_pool_manager_->FetchPage(left_page_id);
     // left_page->RLatch();
   }
+  buffer_pool_manager_->UnpinPage(left_page_id, false);
   // assert(left_page_id > 0);
   // root_latch_.RUnlock();
   return INDEXITERATOR_TYPE(buffer_pool_manager_, left_page->GetPageId(), 0);
@@ -305,17 +306,21 @@ auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
     // page->RUnlatch();
     buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
   }
+  buffer_pool_manager_->UnpinPage(leaf_id, false);
   auto leaf_page = buffer_pool_manager_->FetchPage(leaf_id);
   auto leaf_node = reinterpret_cast<LeafPage *>(leaf_page->GetData());
   auto idx = leaf_node->KeyInd(key, comparator_);
   if (idx == leaf_node->GetSize()) {
     if (leaf_node->GetNextPageId() == INVALID_PAGE_ID) {
+      buffer_pool_manager_->UnpinPage(leaf_id, false);
       return End();
     }
     leaf_page = buffer_pool_manager_->FetchPage(leaf_node->GetNextPageId());
+    buffer_pool_manager_->UnpinPage(leaf_node->GetNextPageId(), false);
     buffer_pool_manager_->UnpinPage(leaf_id, false);
     return INDEXITERATOR_TYPE(buffer_pool_manager_, leaf_page->GetPageId(), 0);
   }
+  buffer_pool_manager_->UnpinPage(leaf_id,false);
   // leaf_page->RUnlatch();
   // root_latch_.RUnlock();
   return INDEXITERATOR_TYPE(buffer_pool_manager_, leaf_page->GetPageId(), idx);
