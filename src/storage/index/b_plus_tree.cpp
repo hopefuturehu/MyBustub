@@ -320,7 +320,7 @@ auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
     buffer_pool_manager_->UnpinPage(leaf_id, false);
     return INDEXITERATOR_TYPE(buffer_pool_manager_, leaf_page->GetPageId(), 0);
   }
-  buffer_pool_manager_->UnpinPage(leaf_id,false);
+  buffer_pool_manager_->UnpinPage(leaf_id, false);
   // leaf_page->RUnlatch();
   // root_latch_.RUnlock();
   return INDEXITERATOR_TYPE(buffer_pool_manager_, leaf_page->GetPageId(), idx);

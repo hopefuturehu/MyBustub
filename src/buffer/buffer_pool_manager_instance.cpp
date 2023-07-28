@@ -42,7 +42,7 @@ auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
   frame_id_t frame_id = -1;
   if (GetAvailableFrame(&frame_id)) {
     *page_id = AllocatePage();
-    std::cout<<std::this_thread::get_id()<<" "<< *page_id<<" Fetched\n";
+    // std::cout << std::this_thread::get_id() << " " << *page_id << " Fetched\n";
     page_table_->Insert(*page_id, frame_id);
     pages_[frame_id].ResetMemory();
     pages_[frame_id].is_dirty_ = false;
@@ -57,7 +57,7 @@ auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
 
 auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
   std::scoped_lock<std::mutex> lock(latch_);
-  std::cout<<std::this_thread::get_id()<<" "<<page_id<<" Fetched\n";
+  // std::cout << std::this_thread::get_id() << " " << page_id << " Fetched\n";
   frame_id_t frame_id;
   if (page_table_->Find(page_id, frame_id)) {
     replacer_->RecordAccess(frame_id);
@@ -81,7 +81,7 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
 
 auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> bool {
   std::scoped_lock<std::mutex> lock(latch_);
-  std::cout<<std::this_thread::get_id()<<" "<<page_id<<" Unpined\n";
+  // std::cout << std::this_thread::get_id() << " " << page_id << " Unpined\n";
   frame_id_t frame_id;
   if (page_table_->Find(page_id, frame_id)) {
     if (is_dirty) {
