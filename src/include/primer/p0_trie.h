@@ -70,7 +70,7 @@ class TrieNode {
    * @param key_char Key char of child node.
    * @return True if this trie node has a child with given key, false otherwise.
    */
-  bool HasChild(char key_char) const { return children_.count(key_char) != 0U; }
+  auto HasChild(char key_char) const -> bool { return children_.count(key_char) != 0U; }
 
   /**
    * TODO(P0): Add implementation
