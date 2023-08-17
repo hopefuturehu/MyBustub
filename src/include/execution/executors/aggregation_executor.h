@@ -72,12 +72,50 @@ class SimpleAggregationHashTable {
    */
   void CombineAggregateValues(AggregateValue *result, const AggregateValue &input) {
     for (uint32_t i = 0; i < agg_exprs_.size(); i++) {
+      auto new_value_is_null = input.aggregates_[i].IsNull();
       switch (agg_types_[i]) {
-        case AggregationType::CountStarAggregate:
-        case AggregationType::CountAggregate:
-        case AggregationType::SumAggregate:
-        case AggregationType::MinAggregate:
+        case AggregationType::CountStarAggregate: {
+          result->aggregates_[i] = result->aggregates_[i].Add(Value(result->aggregates_[i].GetTypeId(), 1));
+          break;
+        }
+        case AggregationType::CountAggregate: {
+          if(!new_value_is_null) {
+            if(result->aggregates_[i].IsNull()) {
+              result->aggregates_[i] = Value(result->aggregates_[i].GetTypeId(),1);
+            } else {
+              result->aggregates_[i] = result->aggregates_[i].Add(Value(result->aggregates_[i].GetTypeId(), 1));
+            }
+          }
+          break;
+        }
+        case AggregationType::SumAggregate: {
+          if(!new_value_is_null) {
+            if(result->aggregates_[i].IsNull()) {
+              result->aggregates_[i] = Value(input.aggregates_[i]);
+            } else {
+              result->aggregates_[i] = result->aggregates_[i].Add(input.aggregates_[i]);
+            }
+          }
+          break;
+        }
+        case AggregationType::MinAggregate:{
+          if (!new_value_is_null) {
+            if (result->aggregates_[i].IsNull()) {
+              result->aggregates_[i] = Value(input.aggregates_[i]);
+            } else {
+              result->aggregates_[i] = result->aggregates_[i].Min(Value(input.aggregates_[i]));
+            }
+          }
+          break;
+        }
         case AggregationType::MaxAggregate:
+          if (!new_value_is_null) {
+            if (result->aggregates_[i].IsNull()) {
+              result->aggregates_[i] = Value(input.aggregates_[i]);
+            } else {
+              result->aggregates_[i] = result->aggregates_[i].Max(Value(input.aggregates_[i]));
+            }
+          }
           break;
       }
     }
@@ -99,6 +137,8 @@ class SimpleAggregationHashTable {
    * Clear the hash table
    */
   void Clear() { ht_.clear(); }
+
+  auto Size() const -> size_t {return ht_.size();}
 
   /** An iterator over the aggregation hash table */
   class Iterator {
@@ -201,8 +241,14 @@ class AggregationExecutor : public AbstractExecutor {
   /** The child executor that produces tuples over which the aggregation is computed */
   std::unique_ptr<AbstractExecutor> child_;
   /** Simple aggregation hash table */
-  // TODO(Student): Uncomment SimpleAggregationHashTable aht_;
+  SimpleAggregationHashTable aht_;
   /** Simple aggregation hash table iterator */
-  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_;
+  // SimpleAggregationHashTable::Iterator aht_iterator_;
+  /** Simple aggregation hash table iterator */
+  SimpleAggregationHashTable::Iterator cursor_;
+  /** Simple aggregation hash table end iterator */
+  SimpleAggregationHashTable::Iterator end_;
+  /*table is Empty*/
+  bool table_empty_;
 };
 }  // namespace bustub
