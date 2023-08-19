@@ -24,6 +24,7 @@
 #include "execution/plans/nested_index_join_plan.h"
 #include "storage/table/tmp_tuple.h"
 #include "storage/table/tuple.h"
+#include "type/value_factory.h"
 
 namespace bustub {
 
@@ -50,5 +51,27 @@ class NestIndexJoinExecutor : public AbstractExecutor {
  private:
   /** The nested index join plan node. */
   const NestedIndexJoinPlanNode *plan_;
+
+  std::unique_ptr<AbstractExecutor> child_executor_;
+  /** The index of the Inner table */
+  IndexInfo *index_{nullptr};
+  /** the current cursor in the outer table */
+  Tuple outer_tuple_{};
+  /** the current RID in the outer table tuple */
+  RID outer_rid_{};
+  /** the current cursor in the inner table */
+  Tuple inner_tuple_{};
+  /** the current RID in the inner table tuple */
+  RID inner_rid_{};
+  /** the index matching rids in the inner table */
+  std::vector<RID> match_rids_{};
+  /** pointer to the inner table */
+  TableInfo *inner_table_ptr_{nullptr};
+  /** Inner Table Schema */
+  Schema inner_schema_;
+  /** Outer Table Schema */
+  Schema outer_schema_;
+  /** Key Schema */
+  Schema key_schema_;
 };
 }  // namespace bustub

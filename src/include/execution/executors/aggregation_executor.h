@@ -79,9 +79,9 @@ class SimpleAggregationHashTable {
           break;
         }
         case AggregationType::CountAggregate: {
-          if(!new_value_is_null) {
-            if(result->aggregates_[i].IsNull()) {
-              result->aggregates_[i] = Value(result->aggregates_[i].GetTypeId(),1);
+          if (!new_value_is_null) {
+            if (result->aggregates_[i].IsNull()) {
+              result->aggregates_[i] = Value(result->aggregates_[i].GetTypeId(), 1);
             } else {
               result->aggregates_[i] = result->aggregates_[i].Add(Value(result->aggregates_[i].GetTypeId(), 1));
             }
@@ -89,8 +89,8 @@ class SimpleAggregationHashTable {
           break;
         }
         case AggregationType::SumAggregate: {
-          if(!new_value_is_null) {
-            if(result->aggregates_[i].IsNull()) {
+          if (!new_value_is_null) {
+            if (result->aggregates_[i].IsNull()) {
               result->aggregates_[i] = Value(input.aggregates_[i]);
             } else {
               result->aggregates_[i] = result->aggregates_[i].Add(input.aggregates_[i]);
@@ -98,7 +98,7 @@ class SimpleAggregationHashTable {
           }
           break;
         }
-        case AggregationType::MinAggregate:{
+        case AggregationType::MinAggregate: {
           if (!new_value_is_null) {
             if (result->aggregates_[i].IsNull()) {
               result->aggregates_[i] = Value(input.aggregates_[i]);
@@ -138,7 +138,7 @@ class SimpleAggregationHashTable {
    */
   void Clear() { ht_.clear(); }
 
-  auto Size() const -> size_t {return ht_.size();}
+  auto Size() const -> size_t { return ht_.size(); }
 
   /** An iterator over the aggregation hash table */
   class Iterator {

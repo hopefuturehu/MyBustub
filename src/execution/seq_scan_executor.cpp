@@ -21,17 +21,17 @@ SeqScanExecutor::SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNod
       cursor_(end_) {}
 
 void SeqScanExecutor::Init() {
-    cursor_ = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_)->table_->Begin(exec_ctx_->GetTransaction());
+  cursor_ = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_)->table_->Begin(exec_ctx_->GetTransaction());
 }
 
 auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
-    if(cursor_ == end_) {
-        return false;
-    }
-    *rid = cursor_->GetRid();
-    *tuple = *cursor_;
-    cursor_++;
-    return true;
+  if (cursor_ == end_) {
+    return false;
+  }
+  *rid = cursor_->GetRid();
+  *tuple = *cursor_;
+  cursor_++;
+  return true;
 }
 
 }  // namespace bustub
