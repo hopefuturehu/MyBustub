@@ -20,10 +20,10 @@ void TopNExecutor::Init() {
         continue;
       }
       auto cmp = a_val.CompareLessThan(b_val);
-      if (cmp == CmpBool::CmpTrue && type == OrderByType::DESC) {
+      if (cmp == CmpBool::CmpTrue && type != OrderByType::DESC) {
         return true;
       }
-      if (cmp == CmpBool::CmpFalse && type != OrderByType::DESC) {
+      if (cmp == CmpBool::CmpFalse && type == OrderByType::DESC) {
         return true;
       }
       return false;
