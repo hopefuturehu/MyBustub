@@ -320,6 +320,9 @@ class LockManager {
 
   auto GrantLock(const std::shared_ptr<LockRequest> &request, const std::shared_ptr<LockRequestQueue> &queue) -> bool;
 
+  auto CheckRowLockUpgrade(Transaction* txn, LockMode lock_mode, RID &rid) -> bool;
+
+  void ModRowLockSet(Transaction *txn, const std::shared_ptr<LockRequest> &request, bool is_insert);
  private:
   /** Fall 2022 */
   /** Structure that holds lock requests for a given table oid */
