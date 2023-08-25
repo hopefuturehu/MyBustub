@@ -15,13 +15,13 @@
 #include <algorithm>
 #include <condition_variable>  // NOLINT
 #include <list>
+#include <map>
 #include <memory>
 #include <mutex>  // NOLINT
-#include <unordered_map>
+#include <set>
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include<set>
 
 #include "common/config.h"
 #include "common/rid.h"
@@ -337,9 +337,31 @@ class LockManager {
   /** Coordination */
   std::mutex row_lock_map_latch_;
 
-  void DFS(std::unordered_set<txn_id_t>& visited, std::deque<txn_id_t>& path, bool& cycle, int node);
+  auto DFS(txn_id_t curr, std::set<txn_id_t> &visited, std::deque<txn_id_t> &path) -> txn_id_t {
+    visited.insert(curr);
+    path.push_back(curr);
+    if (waits_for_.find(curr) != waits_for_.end()) {
+      for (const auto &neighbor : waits_for_[curr]) {
+        if (visited.find(neighbor) == visited.end()) {
+          // this neighbor not visited yet
+          auto cycle_id = DFS(neighbor, visited, path);
+          if (cycle_id != -1) {
+            // a cycle is detected ahead
+            return cycle_id;
+          }
+        } else if (std::find(path.begin(), path.end(), neighbor) != path.end()) {
+          // back edge detected
+          return neighbor;
+        }
+      }
+    }
+    // remove from curr path
+    path.pop_back();
+    return -1;
+  }
+
   void BuildGraph() {
-        waits_for_.clear();
+    waits_for_.clear();
     for (const auto &[table_id, request_queue] : table_lock_map_) {
       std::set<txn_id_t> granted;
       for (const auto &request : request_queue->request_queue_) {
@@ -370,7 +392,7 @@ class LockManager {
   std::atomic<bool> enable_cycle_detection_;
   std::thread *cycle_detection_thread_;
   /** Waits-for graph representation. */
-  std::unordered_map<txn_id_t, std::set<txn_id_t>> waits_for_;
+  std::map<txn_id_t, std::set<txn_id_t>> waits_for_;
   std::mutex waits_for_latch_;
 };
 
