@@ -475,21 +475,74 @@ auto LockManager::UnlockRow(Transaction *txn, const table_oid_t &oid, const RID 
   throw TransactionAbortException(txn->GetTransactionId(), AbortReason::ATTEMPTED_UNLOCK_BUT_NO_LOCK_HELD);
 }
 
-void LockManager::AddEdge(txn_id_t t1, txn_id_t t2) {}
+void LockManager::AddEdge(txn_id_t t1, txn_id_t t2) {
+  waits_for_[t1].emplace(t2);
+}
 
-void LockManager::RemoveEdge(txn_id_t t1, txn_id_t t2) {}
+void LockManager::RemoveEdge(txn_id_t t1, txn_id_t t2) {
+  waits_for_[t1].erase(t2);
+}
 
-auto LockManager::HasCycle(txn_id_t *txn_id) -> bool { return false; }
+void LockManager::DFS(std::unordered_set<int>& visited, std::deque<int>& path, bool& cycle, int node) {
+  if(cycle) { return; }
+  if(visited.count(node) != 0U) {
+    cycle = true;
+    while(path.front() != node) {
+      path.pop_front();
+    }
+    return;
+  }
+  visited.emplace(node);
+  for(auto next_node:waits_for_[node]) {
+    path.emplace_back(next_node);
+    DFS(visited, path, cycle, next_node);
+    path.pop_back();
+  }
+}
+auto LockManager::HasCycle(txn_id_t *txn_id) -> bool {
+  std::unordered_set<txn_id_t> visited;
+  std::deque<txn_id_t> path;
+  bool cycle = false;
+  if(waits_for_.begin() == nullptr) { return false;} 
+  txn_id_t start_node = waits_for_.begin()->first;
+  DFS(visited, path, cycle,  start_node);
+  std::sort(path.begin(), path.end());
+  *txn_id = *path.begin();
+  return cycle;
+}
 
 auto LockManager::GetEdgeList() -> std::vector<std::pair<txn_id_t, txn_id_t>> {
   std::vector<std::pair<txn_id_t, txn_id_t>> edges(0);
+  for(const auto& itr:waits_for_) {
+    for(auto nodes : itr.second) {
+      edges.emplace_back(std::make_pair(itr.first, nodes));
+    }
+  }
   return edges;
 }
 
 void LockManager::RunCycleDetection() {
   while (enable_cycle_detection_) {
-    std::this_thread::sleep_for(cycle_detection_interval);
-    {}
+    std::this_thread::sleep_for(cycle_detection_interval);{
+      std::unique_lock table_lock(table_lock_map_latch_);
+      std::unique_lock row_lock(row_lock_map_latch_);
+      LockManager::BuildGraph();
+    }
+    txn_id_t abort_id;
+    while(HasCycle(&abort_id)) {
+      auto to_abort_ptr = TransactionManager::GetTransaction(abort_id);
+      to_abort_ptr->SetState(TransactionState::ABORTED);
+      waits_for_.erase(abort_id);
+      for (auto &[start_node, end_node_set] : waits_for_) {
+        end_node_set.erase(abort_id);
+      }
+    }
+    for (const auto &[table_id, request_queue] : table_lock_map_) {
+      request_queue->cv_.notify_all();
+    }
+    for (const auto &[row_id, request_queue] : row_lock_map_) {
+      request_queue->cv_.notify_all();
+    }
   }
 }
 

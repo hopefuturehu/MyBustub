@@ -21,6 +21,7 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include<set>
 
 #include "common/config.h"
 #include "common/rid.h"
@@ -336,10 +337,40 @@ class LockManager {
   /** Coordination */
   std::mutex row_lock_map_latch_;
 
+  void DFS(std::unordered_set<txn_id_t>& visited, std::deque<txn_id_t>& path, bool& cycle, int node);
+  void BuildGraph() {
+        waits_for_.clear();
+    for (const auto &[table_id, request_queue] : table_lock_map_) {
+      std::set<txn_id_t> granted;
+      for (const auto &request : request_queue->request_queue_) {
+        if (request->granted_) {
+          granted.insert(request->txn_id_);
+        } else {
+          // waits for a resource, build an edge
+          for (const auto &holder : granted) {
+            AddEdge(request->txn_id_, holder);
+          }
+        }
+      }
+    }
+    for (const auto &[row_id, request_queue] : row_lock_map_) {
+      std::set<txn_id_t> granted;
+      for (const auto &request : request_queue->request_queue_) {
+        if (request->granted_) {
+          granted.insert(request->txn_id_);
+        } else {
+          // waits for a resource, build an edge
+          for (const auto &holder : granted) {
+            AddEdge(request->txn_id_, holder);
+          }
+        }
+      }
+    }
+  }
   std::atomic<bool> enable_cycle_detection_;
   std::thread *cycle_detection_thread_;
   /** Waits-for graph representation. */
-  std::unordered_map<txn_id_t, std::vector<txn_id_t>> waits_for_;
+  std::unordered_map<txn_id_t, std::set<txn_id_t>> waits_for_;
   std::mutex waits_for_latch_;
 };
 
